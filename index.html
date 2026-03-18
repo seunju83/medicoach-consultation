@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>메디코치 약사 상담 보조 시스템</title>
+<style>
+:root {
+  --primary: #2563eb;
+  --primary-light: #dbeafe;
+  --danger: #dc2626;
+  --danger-light: #fee2e2;
+  --warning: #f59e0b;
+  --warning-light: #fef3c7;
+  --success: #16a34a;
+  --success-light: #dcfce7;
+  --info: #6366f1;
+  --bg: #f8fafc;
+  --card: #ffffff;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --border: #e2e8f0;
+  --radius: 12px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI','Apple SD Gothic Neo','Malgun Gothic',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+
+/* Header */
+.header { background:linear-gradient(135deg,#1e40af,#3b82f6); color:#fff; padding:16px 24px; position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,0.15); }
+.header h1 { font-size:20px; font-weight:700; }
+.header p { font-size:12px; opacity:0.85; }
+
+/* Tabs */
+.tabs { display:flex; background:#fff; border-bottom:2px solid var(--border); overflow-x:auto; position:sticky; top:60px; z-index:99; }
+.tab { padding:12px 20px; cursor:pointer; font-size:14px; font-weight:600; border:none; background:none; color:var(--text-secondary); white-space:nowrap; border-bottom:3px solid transparent; transition:all 0.2s; }
+.tab:hover { color:var(--primary); background:var(--primary-light); }
+.tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+
+/* Main */
+.main { max-width:1200px; margin:0 auto; padding:20px; }
+.section { display:none; }
+.section.active { display:block; }
+
+/* Cards */
+.card { background:var(--card); border-radius:var(--radius); box-shadow:0 1px 3px rgba(0,0,0,0.08); padding:20px; margin-bottom:16px; border:1px solid var(--border); }
+.card h3 { font-size:16px; margin-bottom:12px; color:var(--primary); display:flex; align-items:center; gap:8px; }
+.card h4 { font-size:14px; margin:12px 0 8px; color:var(--text); }
+
+/* Form */
+.form-group { margin-bottom:16px; }
+.form-group label { display:block; font-size:13px; font-weight:600; margin-bottom:4px; color:var(--text-secondary); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+input, select, textarea { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; transition:border 0.2s; }
+input:focus, select:focus, textarea:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(37,99,235,0.1); }
+
+/* Chips/Tags */
+.chip-group { display:flex; flex-wrap:wrap; gap:8px; }
+.chip { padding:6px 14px; border-radius:20px; font-size:13px; cursor:pointer; border:1.5px solid var(--border); background:#fff; transition:all 0.2s; user-select:none; }
+.chip:hover { border-color:var(--primary); }
+.chip.selected { background:var(--primary); color:#fff; border-color:var(--primary); }
+.chip.danger { background:var(--danger); color:#fff; border-color:var(--danger); }
+
+/* Product Grid */
+.product-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+.product-card { padding:14px; border-radius:10px; border:2px solid var(--border); cursor:pointer; transition:all 0.2s; position:relative; }
+.product-card:hover { border-color:var(--primary); transform:translateY(-1px); }
+.product-card.selected { border-color:var(--primary); background:var(--primary-light); }
+.product-card .name { font-weight:700; font-size:14px; margin-bottom:4px; }
+.product-card .dose { font-size:12px; color:var(--text-secondary); }
+.product-card .tags { margin-top:6px; display:flex; flex-wrap:wrap; gap:4px; }
+.product-card .tag { font-size:10px; padding:2px 8px; border-radius:10px; background:#f1f5f9; color:var(--text-secondary); }
+.product-card .ingredients-preview { font-size:11px; color:var(--text-secondary); margin-top:6px; line-height:1.4; }
+
+/* Buttons */
+.btn { padding:12px 24px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; border:none; transition:all 0.2s; }
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-primary:hover { background:#1d4ed8; }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-outline { background:#fff; color:var(--primary); border:2px solid var(--primary); }
+.btn-outline:hover { background:var(--primary-light); }
+.btn-group { display:flex; gap:8px; margin-top:16px; }
+
+/* Alerts */
+.alert { padding:12px 16px; border-radius:8px; margin-bottom:10px; font-size:13px; border-left:4px solid; }
+.alert-danger { background:var(--danger-light); border-color:var(--danger); color:#991b1b; }
+.alert-warning { background:var(--warning-light); border-color:var(--warning); color:#92400e; }
+.alert-success { background:var(--success-light); border-color:var(--success); color:#166534; }
+.alert-info { background:#e0e7ff; border-color:var(--info); color:#3730a3; }
+
+/* Tables */
+.screening-table { width:100%; border-collapse:collapse; font-size:13px; }
+.screening-table th { background:#f1f5f9; padding:10px 12px; text-align:left; font-weight:600; border-bottom:2px solid var(--border); }
+.screening-table td { padding:8px 12px; border-bottom:1px solid var(--border); }
+.screening-table tr:hover { background:#f8fafc; }
+.status-exceed { color:var(--danger); font-weight:700; }
+.status-warn { color:var(--warning); font-weight:700; }
+.status-dup { color:var(--info); font-weight:600; }
+.status-ok { color:var(--success); }
+
+/* Progress bar */
+.progress-bar { height:8px; background:#e2e8f0; border-radius:4px; overflow:hidden; margin-top:4px; }
+.progress-fill { height:100%; border-radius:4px; transition:width 0.3s; }
+.progress-ok { background:var(--success); }
+.progress-warn { background:var(--warning); }
+.progress-danger { background:var(--danger); }
+
+/* Medication list */
+.med-list { list-style:none; }
+.med-list li { padding:8px 12px; background:#f8fafc; margin-bottom:4px; border-radius:6px; display:flex; justify-content:space-between; align-items:center; }
+.med-list li button { background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; }
+
+/* Blood test input */
+.blood-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:8px; }
+.blood-item { display:flex; align-items:center; gap:8px; }
+.blood-item label { font-size:12px; min-width:90px; }
+.blood-item input { width:80px; padding:6px 8px; font-size:13px; }
+.blood-item .unit { font-size:11px; color:var(--text-secondary); }
+
+/* Timing schedule */
+.timing-card { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+.timing-slot { padding:12px; background:#f8fafc; border-radius:8px; border:1px solid var(--border); }
+.timing-slot h5 { font-size:13px; color:var(--primary); margin-bottom:8px; }
+.timing-slot ul { list-style:none; font-size:12px; }
+.timing-slot li { padding:3px 0; }
+
+/* Responsive */
+@media(max-width:768px) {
+  .form-row, .form-row-3 { grid-template-columns:1fr; }
+  .product-grid { grid-template-columns:1fr; }
+  .tabs { font-size:12px; }
+  .tab { padding:10px 14px; }
+}
+/* Print */
+@media print {
+  .header,.tabs,.btn,.btn-group { display:none; }
+  .section { display:block !important; }
+  .card { break-inside:avoid; box-shadow:none; border:1px solid #ddd; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>메디코치 약사 상담 보조 시스템</h1>
+  <p>영양제 맞춤 추천 · 성분 중복/상한량 스크리닝 · 드럭머거 분석</p>
+</div>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-tab="intake">1. 고객 정보</div>
+  <div class="tab" data-tab="medications">2. 복용 약물</div>
+  <div class="tab" data-tab="bloodtest">3. 혈액검사</div>
+  <div class="tab" data-tab="products">4. 제품 선택</div>
+  <div class="tab" data-tab="screening">5. 스크리닝</div>
+  <div class="tab" data-tab="report">6. 상담 보고서</div>
+  <div class="tab" data-tab="saved" style="margin-left:auto;color:#6366f1">📂 저장 목록</div>
+</div>
+
+<div class="main">
+
+<!-- ===================== 1. 고객 정보 ===================== -->
+<div class="section active" id="sec-intake">
+  <div class="card">
+    <h3>👤 기본 정보</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>성별</label>
+        <select id="gender"><option value="여성">여성</option><option value="남성">남성</option></select>
+      </div>
+      <div class="form-group">
+        <label>나이</label>
+        <input type="number" id="age" placeholder="30" min="1" max="120">
+      </div>
+    </div>
+    <div class="form-row-3">
+      <div class="form-group">
+        <label>키 (cm)</label>
+        <input type="number" id="height" placeholder="165">
+      </div>
+      <div class="form-group">
+        <label>체중 (kg)</label>
+        <input type="number" id="weight" placeholder="60">
+      </div>
+      <div class="form-group">
+        <label>BMI</label>
+        <input type="text" id="bmi" readonly style="background:#f1f5f9">
+      </div>
+    </div>
+    <div class="form-row" id="female-fields" style="display:none">
+      <div class="form-group">
+        <label>임신/수유</label>
+        <select id="pregnancy">
+          <option>해당 없음</option><option>임신 준비 중</option>
+          <option>임신 중(초기)</option><option>임신 중(중기)</option><option>임신 중(후기)</option>
+          <option>수유 중</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>폐경 여부</label>
+        <select id="menopause">
+          <option>해당 없음</option><option>폐경전후기(불규칙)</option><option>폐경 완료</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🎯 관리 분야 선택 (최대 5개)</h3>
+    <div class="chip-group" id="concerns-chips"></div>
+  </div>
+
+  <div class="card">
+    <h3>🏥 기저질환</h3>
+    <div class="chip-group" id="conditions-chips"></div>
+  </div>
+
+  <div class="card">
+    <h3>🏃 생활습관</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>수면 시간</label>
+        <select id="sleep"><option>5시간 미만</option><option>5~6시간</option><option selected>6~7시간</option><option>7~8시간</option><option>8시간 이상</option></select>
+      </div>
+      <div class="form-group">
+        <label>운동 빈도</label>
+        <select id="exercise"><option>거의 안 함</option><option>주 1~2회</option><option selected>주 3~4회</option><option>주 5회 이상</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>음주</label>
+        <select id="alcohol"><option selected>전혀 안 함</option><option>월 1~2회</option><option>주 1~2회</option><option>주 3~4회</option><option>거의 매일</option></select>
+      </div>
+      <div class="form-group">
+        <label>흡연</label>
+        <select id="smoking"><option selected>비흡연</option><option>과거 흡연(금연)</option><option>현재 흡연</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>일광 노출</label>
+        <select id="sun"><option>거의 없음</option><option selected>30분 미만</option><option>30분~1시간</option><option>1시간 이상</option></select>
+      </div>
+      <div class="form-group">
+        <label>스트레스 (1~10)</label>
+        <input type="range" id="stress" min="1" max="10" value="5">
+        <span id="stress-val">5</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>⚠️ 알레르기</h3>
+    <div class="chip-group" id="allergy-chips"></div>
+  </div>
+
+  <div class="card">
+    <h3>📝 초기 메모</h3>
+    <div class="form-group">
+      <label>상담 목적 / 고객 요청사항</label>
+      <textarea id="intake-memo" rows="3" placeholder="예: 부모님 선물용으로 알아보고 있음 / 6개월 후 임신 계획 / 최근 체력 저하로 종합 상담 희망"></textarea>
+    </div>
+    <div class="form-group">
+      <label>현재 복용 중인 건강기능식품 (기존 제품)</label>
+      <textarea id="current-supplements" rows="2" placeholder="예: 센트룸 멀티비타민 1년째 복용 중, 효과 체감 없음"></textarea>
+    </div>
+  </div>
+
+  <div class="btn-group" style="justify-content:flex-end">
+    <button class="btn btn-primary" onclick="goTab('medications')">다음: 복용 약물 →</button>
+  </div>
+</div>
+
+<!-- ===================== 2. 복용 약물 ===================== -->
+<div class="section" id="sec-medications">
+  <div class="card">
+    <h3>💊 현재 복용 중인 처방약</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>약물명</label>
+        <input type="text" id="med-name" placeholder="예: 메트포르민 500mg" list="med-suggestions">
+        <datalist id="med-suggestions">
+          <option>메트포르민 500mg</option><option>메트포르민 1000mg</option>
+          <option>아토르바스타틴 10mg</option><option>아토르바스타틴 20mg</option>
+          <option>로수바스타틴 5mg</option><option>로수바스타틴 10mg</option>
+          <option>오메프라졸 20mg</option><option>판토프라졸 40mg</option><option>에소메프라졸 20mg</option>
+          <option>레보티록신 50mcg</option><option>레보티록신 100mcg</option>
+          <option>암로디핀 5mg</option><option>텔미사르탄 40mg</option><option>로사르탄 50mg</option>
+          <option>아스피린 100mg</option><option>와파린 2mg</option><option>클로피도그렐 75mg</option>
+          <option>에스시탈로프람 10mg</option><option>설트랄린 50mg</option>
+          <option>알렌드로네이트 70mg(주1회)</option>
+          <option>레보노르게스트렐/에티닐에스트라디올(경구피임약)</option>
+          <option>탐스로신 0.2mg</option><option>레보도파/카르비도파</option>
+        </datalist>
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end">
+        <button class="btn btn-primary" onclick="addMedication()">추가</button>
+      </div>
+    </div>
+    <ul class="med-list" id="med-list"></ul>
+  </div>
+
+  <div class="card" id="drugmugger-panel" style="display:none">
+    <h3>🔔 드럭머거 분석 결과</h3>
+    <div id="drugmugger-results"></div>
+  </div>
+
+  <div class="btn-group" style="justify-content:space-between">
+    <button class="btn btn-outline" onclick="goTab('intake')">← 이전</button>
+    <button class="btn btn-primary" onclick="goTab('bloodtest')">다음: 혈액검사 →</button>
+  </div>
+</div>
+
+<!-- ===================== 3. 혈액검사 ===================== -->
+<div class="section" id="sec-bloodtest">
+  <div class="card">
+    <h3>🔬 혈액검사 결과 입력 (아는 항목만)</h3>
+    <div class="blood-grid" id="blood-grid"></div>
+  </div>
+
+  <div class="card" id="blood-analysis-panel" style="display:none">
+    <h3>📊 혈액검사 분석 결과</h3>
+    <div id="blood-analysis-results"></div>
+  </div>
+
+  <div class="btn-group" style="justify-content:space-between">
+    <button class="btn btn-outline" onclick="goTab('medications')">← 이전</button>
+    <button class="btn btn-primary" onclick="analyzeBloodTest();goTab('products')">분석 후 제품 선택 →</button>
+  </div>
+</div>
+
+<!-- ===================== 4. 제품 선택 ===================== -->
+<div class="section" id="sec-products">
+  <div class="card">
+    <h3>🏷️ 카테고리 필터</h3>
+    <div class="chip-group" id="category-filter"></div>
+  </div>
+
+  <div class="card">
+    <h3>📦 메디코치 제품 선택 <span id="selected-count" style="font-size:13px;color:var(--primary);margin-left:8px">(0개 선택)</span></h3>
+    <div class="product-grid" id="product-grid"></div>
+  </div>
+
+  <div class="btn-group" style="justify-content:space-between">
+    <button class="btn btn-outline" onclick="goTab('bloodtest')">← 이전</button>
+    <button class="btn btn-primary" onclick="runScreening();goTab('screening')">스크리닝 실행 →</button>
+  </div>
+</div>
+
+<!-- ===================== 5. 스크리닝 ===================== -->
+<div class="section" id="sec-screening">
+  <div id="screening-alerts"></div>
+
+  <div class="card">
+    <h3>📊 영양소 합산 테이블</h3>
+    <div style="overflow-x:auto">
+      <table class="screening-table" id="screening-table">
+        <thead>
+          <tr><th>영양소</th><th>합산량</th><th>단위</th><th>RDA%</th><th>UL%</th><th>상태</th><th>출처</th></tr>
+        </thead>
+        <tbody id="screening-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="btn-group" style="justify-content:space-between">
+    <button class="btn btn-outline" onclick="goTab('products')">← 제품 수정</button>
+    <button class="btn btn-primary" onclick="generateReport();goTab('report')">보고서 생성 →</button>
+  </div>
+</div>
+
+<!-- ===================== 6. 보고서 ===================== -->
+<div class="section" id="sec-report">
+  <div id="report-content"></div>
+  <div class="btn-group" style="justify-content:center;margin-top:20px;flex-wrap:wrap">
+    <button class="btn btn-primary" onclick="window.print()">🖨️ 인쇄</button>
+    <button class="btn btn-primary" style="background:#16a34a" onclick="saveConsultation()">💾 상담 저장</button>
+    <button class="btn btn-primary" style="background:#6366f1" onclick="exportConsultation()">📤 파일 내보내기</button>
+    <button class="btn btn-outline" onclick="goTab('intake')">새 상담 시작</button>
+  </div>
+</div>
+
+<!-- ===================== 저장된 상담 목록 (헤더에서 접근) ===================== -->
+<div class="section" id="sec-saved">
+  <div class="card">
+    <h3>📂 저장된 상담 목록</h3>
+    <div class="btn-group" style="margin-bottom:16px">
+      <button class="btn btn-primary" style="background:#6366f1" onclick="document.getElementById('import-file').click()">📥 파일 불러오기</button>
+      <button class="btn btn-outline" onclick="exportAllConsultations()">📤 전체 백업</button>
+      <input type="file" id="import-file" accept=".json" style="display:none" onchange="importConsultation(event)">
+    </div>
+    <div id="saved-list"></div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// 메디코치 제품 데이터 (실제 제품 카탈로그)
+// ══════════════════════════════════════════════════════════════
+const PRODUCTS = [
+  {id:"MC-MULTI",name:"멀티비타민 올인원",dose:"1정",cat:["피로","항노화","면역력"],
+   ing:[{n:"비타민A",a:700,u:"mcg RAE"},{n:"비타민B1",a:1.2,u:"mg"},{n:"비타민B2",a:1.4,u:"mg"},{n:"나이아신",a:15,u:"mg NE"},{n:"판토텐산",a:5,u:"mg"},{n:"비타민B6",a:1.5,u:"mg"},{n:"엽산",a:400,u:"mcg DFE"},{n:"비타민B12",a:2.4,u:"mcg"},{n:"비오틴",a:30,u:"mcg"},{n:"비타민C",a:50,u:"mg"},{n:"비타민D",a:10,u:"mcg"},{n:"비타민E",a:11,u:"mg α-TE"},{n:"비타민K",a:70,u:"mcg"},{n:"칼슘",a:210,u:"mg"},{n:"마그네슘",a:94.5,u:"mg"},{n:"철",a:12,u:"mg"},{n:"아연",a:8.5,u:"mg"},{n:"구리",a:0.8,u:"mg"},{n:"셀렌",a:55,u:"mcg"},{n:"요오드",a:150,u:"mcg"},{n:"망간",a:3,u:"mg"},{n:"몰리브덴",a:25,u:"mcg"},{n:"크롬",a:30,u:"mcg"}]},
+  {id:"MC-PANTO-BIOTIN",name:"판토비오틴",dose:"2정",cat:["피부·탈모","피로"],
+   ing:[{n:"비타민B1",a:200,u:"mg"},{n:"비타민B2",a:12,u:"mg"},{n:"나이아신",a:50,u:"mg NE"},{n:"판토텐산",a:200,u:"mg"},{n:"비타민B6",a:10,u:"mg"},{n:"엽산",a:600,u:"mcg DFE"},{n:"비타민B12",a:20,u:"mcg"},{n:"비오틴",a:5000,u:"mcg"},{n:"철",a:6,u:"mg"},{n:"아연",a:8.5,u:"mg"}]},
+  {id:"MC-HEM-IRON",name:"헴철&비헴철",dose:"1정",cat:["피로"],
+   ing:[{n:"엽산",a:800,u:"mcg DFE"},{n:"비타민B12",a:10,u:"mcg"},{n:"비타민C",a:100,u:"mg"},{n:"철",a:25,u:"mg"}]},
+  {id:"MC-OMEGA3",name:"rTG 오메가3",dose:"1캡슐",cat:["콜레스테롤","혈행","눈","혈압"],
+   ing:[{n:"EPA+DHA",a:600,u:"mg"},{n:"비타민E",a:11,u:"mg α-TE"}]},
+  {id:"MC-VITD",name:"비타민D 2000IU",dose:"1정",cat:["뼈","항노화","면역력"],
+   ing:[{n:"비타민D",a:50,u:"mcg"}]},
+  {id:"MC-VITC",name:"비타민C",dose:"1정",cat:["항노화","피부·탈모"],
+   ing:[{n:"비타민C",a:500,u:"mg"}]},
+  {id:"MC-PROBIOTICS",name:"프로바이오틱스",dose:"1캡슐",cat:["장","면역력"],
+   ing:[{n:"프로바이오틱스",a:30,u:"억 CFU"}]},
+  {id:"MC-LUTEIN",name:"루테인지아잔틴 아스타잔틴 플러스",dose:"1캡슐",cat:["눈"],
+   ing:[{n:"루테인",a:18.18,u:"mg"},{n:"지아잔틴",a:1.82,u:"mg"},{n:"아스타잔틴",a:4,u:"mg"},{n:"아연",a:8.5,u:"mg"},{n:"셀렌",a:55,u:"mcg"}]},
+  {id:"MC-COQ10",name:"코엔자임Q10",dose:"1캡슐",cat:["혈압","항노화"],
+   ing:[{n:"코엔자임Q10",a:100,u:"mg"}]},
+  {id:"MC-MILKTHISTLE",name:"밀크씨슬",dose:"1정",cat:["간","피로"],
+   ing:[{n:"비타민B1",a:1.2,u:"mg"},{n:"비타민B2",a:1.4,u:"mg"},{n:"나이아신",a:15,u:"mg NE"},{n:"판토텐산",a:5,u:"mg"},{n:"비타민B6",a:1.5,u:"mg"},{n:"실리마린",a:130,u:"mg"}]},
+  {id:"MC-MAG400",name:"파워 마그네슘 400",dose:"1정",cat:["수면·긴장완화","피로","뼈"],
+   ing:[{n:"마그네슘",a:400,u:"mg"}]},
+  {id:"MC-BONE",name:"바이본정",dose:"2정",cat:["뼈","항노화"],
+   ing:[{n:"칼슘",a:300,u:"mg"},{n:"마그네슘",a:150,u:"mg"},{n:"폴리감마글루탐산",a:70,u:"mg"},{n:"아연",a:8.5,u:"mg"},{n:"비타민D",a:10,u:"mcg"}]},
+  {id:"MC-CURCUMIN",name:"바이액트정",dose:"2정",cat:["혈행"],
+   ing:[{n:"커큐민",a:68.5,u:"mg"}]},
+  {id:"MC-SAW-PALMETTO",name:"쏘팔옥타맥스",dose:"1캡슐",cat:["전립선","요로"],
+   ing:[{n:"옥타코사놀",a:40,u:"mg"},{n:"로르산",a:115,u:"mg"},{n:"아연",a:25,u:"mg"}]},
+  {id:"MC-ANTI-AGING",name:"안티노을",dose:"1정",cat:["갱년기","항노화"],
+   ing:[{n:"비타민D",a:10,u:"mcg"},{n:"비타민B6",a:1.5,u:"mg"},{n:"셀렌",a:55,u:"mcg"},{n:"소포리코사이드",a:35,u:"mg"}]},
+  {id:"MC-GINKGO",name:"은행잎",dose:"1정",cat:["기억·인지력","혈행"],
+   ing:[{n:"비타민B6",a:1.5,u:"mg"},{n:"플라보놀배당체",a:36,u:"mg"}]},
+  {id:"MC-DENTAL",name:"덴탈케어",dose:"2정",cat:["구강·치아"],
+   ing:[{n:"칼슘",a:210,u:"mg"},{n:"비타민C",a:50,u:"mg"},{n:"아연",a:8.5,u:"mg"},{n:"총 플라보노이드",a:20,u:"mg"}]},
+  {id:"MC-RED-GINSENG",name:"홍삼플러스",dose:"1정",cat:["피로"],
+   ing:[{n:"아연",a:8.5,u:"mg"},{n:"판토텐산",a:5,u:"mg"},{n:"비타민B6",a:1.5,u:"mg"},{n:"진세노사이드",a:5,u:"mg"}]},
+  {id:"MC-MEMORY-PS",name:"기억엔PS",dose:"2캡슐",cat:["기억·인지력"],
+   ing:[{n:"포스파티딜세린",a:300,u:"mg"},{n:"플라보놀배당체",a:28,u:"mg"}]},
+  {id:"MC-BLOOD-SUGAR",name:"혈당엔 바나바",dose:"1정",cat:["혈당"],
+   ing:[{n:"비타민B1",a:1.2,u:"mg"},{n:"비타민B2",a:1.4,u:"mg"},{n:"나이아신",a:15,u:"mg NE"},{n:"비타민B6",a:1.5,u:"mg"},{n:"비타민B12",a:10,u:"mcg"},{n:"아연",a:12,u:"mg"},{n:"셀렌",a:200,u:"mcg"},{n:"크롬",a:400,u:"mcg"},{n:"코로솔산",a:1.3,u:"mg"}]},
+  {id:"MC-PMS",name:"코치 PMS",dose:"1캡슐",cat:["월경전증후군","갱년기"],
+   ing:[{n:"비타민E",a:11,u:"mg α-TE"},{n:"감마리놀렌산",a:240,u:"mg"}]},
+  {id:"MC-JOINT-MSM",name:"관절엔 MSM",dose:"2정",cat:["항노화","관절·연골","뼈"],
+   ing:[{n:"비타민D",a:25,u:"mcg"},{n:"MSM",a:1500,u:"mg"}]},
+  {id:"MC-ANTI-STRESS",name:"안티스트레스",dose:"2정",cat:["수면·긴장완화"],
+   ing:[{n:"L-테아닌",a:250,u:"mg"},{n:"마그네슘",a:94.5,u:"mg"},{n:"로사빈",a:13.2,u:"mg"}]},
+  {id:"MC-DIET",name:"다이어트",dose:"2정",cat:["다이어트"],
+   ing:[{n:"판토텐산",a:5,u:"mg"},{n:"비타민B2",a:1.4,u:"mg"},{n:"총(-)-HCA",a:750,u:"mg"}]}
+];
+
+// UL 데이터
+const UL={
+  "비타민A":{ul:3000,u:"mcg RAE",rda:700,tox:"두통,구역,간독성,임신시기형"},
+  "비타민D":{ul:100,u:"mcg",rda:10,tox:"고칼슘혈증,신장결석",note:"여러 제품에 소량씩 포함→합산주의"},
+  "비타민E":{ul:540,u:"mg α-TE",rda:11,practical:268,tox:"출혈위험증가"},
+  "비타민C":{ul:2000,u:"mg",rda:100,tox:"설사,복통,신장결석"},
+  "비타민B1":{rda:1.2},
+  "비타민B2":{rda:1.4},
+  "나이아신":{ul:35,u:"mg NE",rda:15,tox:"플러싱(홍조),간독성",note:"니코틴아마이드형태면 플러싱적으나 고용량시 간주의"},
+  "판토텐산":{rda:5},
+  "비타민B6":{ul:100,u:"mg",rda:1.5,tox:"말초신경병증(손발저림)"},
+  "엽산":{ul:1000,u:"mcg DFE",rda:400,tox:"B12결핍가림"},
+  "비타민B12":{rda:2.4},
+  "비오틴":{rda:30,note:"고용량(>250mcg)혈액검사교란"},
+  "비타민K":{rda:70,note:"와파린복용자주의"},
+  "칼슘":{ul:2500,u:"mg",rda:800,diet:500,tox:"신장결석,변비"},
+  "철":{ul:45,u:"mg",rda:12,tox:"구역,변비,간독성"},
+  "마그네슘":{ul:350,u:"mg",rda:350,suppOnly:true,tox:"설사,저혈압"},
+  "아연":{ul:35,u:"mg",rda:8.5,tox:"구역,구리결핍"},
+  "셀렌":{ul:400,u:"mcg",rda:55,tox:"탈모,손발톱변형"},
+  "구리":{ul:10,u:"mg",rda:0.9},
+  "망간":{ul:11,u:"mg",rda:3},
+  "크롬":{practical:1000,u:"mcg",rda:30},
+  "요오드":{ul:2400,u:"mcg",rda:150},
+  "몰리브덴":{ul:2000,u:"mcg",rda:45},
+  "EPA+DHA":{practical:3000,u:"mg"},
+};
+
+// 드럭머거 데이터
+const DRUG_MUGGERS = [
+  {drugs:["스타틴","아토르바스타틴","로수바스타틴","심바스타틴","리피토","크레스토"],depleted:[{n:"코엔자임Q10",reason:"메발론산 경로 억제→CoQ10 합성↓",rec:"MC-COQ10"},{n:"비타민D",reason:"간접적 비타민D 전환 영향",rec:"MC-VITD"}]},
+  {drugs:["메트포르민","글루코파지"],depleted:[{n:"비타민B12",reason:"회장 말단 B12-내인자 흡수 억제",rec:"MC-HEM-IRON"},{n:"엽산",reason:"흡수 감소",rec:"MC-MULTI"}]},
+  {drugs:["오메프라졸","판토프라졸","에소메프라졸","넥시움","란소프라졸","PPI"],depleted:[{n:"마그네슘",reason:"TRPM6 채널 억제→장내 Mg 흡수↓",rec:"MC-MAG400"},{n:"비타민B12",reason:"위산↓→B12 유리↓",rec:"MC-HEM-IRON"},{n:"칼슘",reason:"위산↓→Ca 용해↓",rec:"MC-BONE"},{n:"철분",reason:"위산↓→비헴철 흡수↓",rec:"MC-HEM-IRON"}]},
+  {drugs:["경구피임약","레보노르게스트렐","에티닐에스트라디올","피임약"],depleted:[{n:"비타민B6",reason:"트립토판 대사 변화→B6 소모↑",rec:"MC-MULTI"},{n:"엽산",reason:"흡수↓",rec:"MC-MULTI"},{n:"마그네슘",reason:"소변 배출↑",rec:"MC-MAG400"},{n:"아연",reason:"혈중 아연↓",rec:"MC-LUTEIN"}]},
+  {drugs:["HCTZ","히드로클로로티아지드","인다파마이드","이뇨제"],depleted:[{n:"마그네슘",reason:"신장 재흡수↓",rec:"MC-MAG400"},{n:"아연",reason:"소변 배출↑",rec:"MC-LUTEIN"}]},
+  {drugs:["로사르탄","발사르탄","텔미사르탄","라미프릴","에날라프릴","ACE","ARB"],depleted:[{n:"아연",reason:"ACE 억제→아연 킬레이션",rec:"MC-LUTEIN"}]},
+  {drugs:["에스시탈로프람","설트랄린","플루옥세틴","벤라팍신","SSRI","SNRI"],depleted:[{n:"엽산/B12",reason:"메틸화 대사 연관, 부족시 치료반응↓",rec:"MC-MULTI"}]},
+  {drugs:["발프로산","카르바마제핀","페니토인","항경련제"],depleted:[{n:"비타민D",reason:"CYP450 유도→D 비활성화↑",rec:"MC-VITD"},{n:"엽산",reason:"흡수↓ 및 대사 방해",rec:"MC-MULTI"}]},
+];
+
+// 혈액검사 항목
+const BLOOD_MARKERS = [
+  {id:"vitD",name:"25(OH)D",unit:"ng/mL",ranges:[{max:10,s:"심한결핍",r:"MC-VITD"},{max:20,s:"결핍",r:"MC-VITD"},{max:30,s:"부족",r:"MC-VITD"},{max:100,s:"적절"}]},
+  {id:"ferritin",name:"페리틴",unit:"ng/mL",genderRanges:true,rangesF:[{max:15,s:"고갈",r:"MC-HEM-IRON"},{max:30,s:"부족",r:"MC-HEM-IRON"},{max:150,s:"적절"}],rangesM:[{max:30,s:"부족",r:"MC-HEM-IRON"},{max:400,s:"적절"}]},
+  {id:"hb",name:"혈색소(Hb)",unit:"g/dL",genderRanges:true,rangesF:[{max:12,s:"빈혈",r:"MC-HEM-IRON"},{max:16,s:"정상"}],rangesM:[{max:13,s:"빈혈",r:"MC-HEM-IRON"},{max:17.5,s:"정상"}]},
+  {id:"b12",name:"비타민B12",unit:"pg/mL",ranges:[{max:200,s:"결핍",r:"MC-HEM-IRON"},{max:350,s:"경계부족",r:"MC-MULTI"},{max:900,s:"적절"}]},
+  {id:"homocys",name:"호모시스테인",unit:"μmol/L",ranges:[{max:10,s:"최적"},{max:15,s:"경계상승",r:"MC-MULTI"},{max:99,s:"상승",r:"MC-MULTI"}]},
+  {id:"glucose",name:"공복혈당",unit:"mg/dL",ranges:[{max:100,s:"정상"},{max:125,s:"전당뇨",r:"MC-BLOOD-SUGAR"},{max:999,s:"당뇨범위"}]},
+  {id:"hba1c",name:"HbA1c",unit:"%",ranges:[{max:5.7,s:"정상"},{max:6.4,s:"전당뇨",r:"MC-BLOOD-SUGAR"},{max:99,s:"당뇨범위"}]},
+  {id:"tg",name:"중성지방",unit:"mg/dL",ranges:[{max:150,s:"정상"},{max:199,s:"경계",r:"MC-OMEGA3"},{max:499,s:"높음",r:"MC-OMEGA3"},{max:9999,s:"매우높음",r:"MC-OMEGA3"}]},
+  {id:"ast",name:"AST(GOT)",unit:"U/L",ranges:[{max:40,s:"정상"},{max:80,s:"경도상승",r:"MC-MILKTHISTLE"},{max:9999,s:"상승",r:"MC-MILKTHISTLE"}]},
+  {id:"alt",name:"ALT(GPT)",unit:"U/L",ranges:[{max:41,s:"정상"},{max:80,s:"경도상승",r:"MC-MILKTHISTLE"},{max:9999,s:"상승",r:"MC-MILKTHISTLE"}]},
+  {id:"mg",name:"마그네슘",unit:"mg/dL",ranges:[{max:1.7,s:"저하",r:"MC-MAG400"},{max:2.2,s:"정상"}]},
+  {id:"zn",name:"아연",unit:"μg/dL",ranges:[{max:66,s:"부족",r:"MC-LUTEIN"},{max:110,s:"정상"}]},
+  {id:"tsh",name:"TSH",unit:"mIU/L",ranges:[{max:0.27,s:"억제(항진의심)"},{max:4.2,s:"정상"},{max:10,s:"경도상승"},{max:999,s:"상승"}]},
+];
+
+// 관리분야 전체 목록
+const CATEGORIES = [
+  "기억·인지력","피로","수면·긴장완화","눈","구강·치아",
+  "피부·탈모","항노화","다이어트","콜레스테롤","혈압",
+  "혈행","혈당","갱년기","신장·요로",
+  "관절·연골","뼈","위","간","장",
+  "전립선","요로","월경전증후군","면역력"
+];
+
+const CONDITIONS = [
+  "없음","고혈압","당뇨병(2형)","이상지질혈증","갑상선기능저하증","갑상선기능항진증",
+  "위식도역류질환(GERD)","과민성대장증후군(IBS)","골다공증","골감소증",
+  "관절염","천식/알레르기","우울증/불안장애","빈혈","통풍",
+  "만성신장질환","지방간","자가면역질환","전립선비대증"
+];
+
+const ALLERGIES = ["없음","조개류/갑각류","대두(콩)","유제품","글루텐","견과류","계란"];
+
+// ══════════════════════════════════════════════════════════════
+// 앱 상태
+// ══════════════════════════════════════════════════════════════
+let state = {
+  selectedConcerns: [],
+  selectedConditions: [],
+  selectedAllergies: [],
+  medications: [],
+  bloodTests: {},
+  selectedProducts: [],
+  drugMuggerResults: [],
+  bloodAnalysis: [],
+  screeningResult: null,
+};
+
+// ══════════════════════════════════════════════════════════════
+// 초기화
+// ══════════════════════════════════════════════════════════════
+function init() {
+  // 탭
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => goTab(t.dataset.tab));
+
+  // 성별 변경 시 여성 필드 표시
+  document.getElementById('gender').onchange = e => {
+    document.getElementById('female-fields').style.display = e.target.value === '여성' ? '' : 'none';
+  };
+  document.getElementById('gender').dispatchEvent(new Event('change'));
+
+  // BMI 계산
+  ['height','weight'].forEach(id => document.getElementById(id).oninput = calcBMI);
+
+  // 스트레스 슬라이더
+  document.getElementById('stress').oninput = e => document.getElementById('stress-val').textContent = e.target.value;
+
+  // 칩 그룹 생성
+  createChips('concerns-chips', CATEGORIES, 'selectedConcerns', 5);
+  createChips('conditions-chips', CONDITIONS, 'selectedConditions', 10);
+  createChips('allergy-chips', ALLERGIES, 'selectedAllergies', 5);
+
+  // 혈액검사 입력 필드
+  const bg = document.getElementById('blood-grid');
+  BLOOD_MARKERS.forEach(m => {
+    bg.innerHTML += `<div class="blood-item"><label>${m.name}</label><input type="number" step="any" id="blood-${m.id}" placeholder="-"><span class="unit">${m.unit}</span></div>`;
+  });
+
+  // 카테고리 필터
+  renderCategoryFilter();
+
+  // 제품 그리드
+  renderProducts();
+}
+
+function goTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === 'sec-'+tab));
+  window.scrollTo(0, 0);
+}
+
+function calcBMI() {
+  const h = parseFloat(document.getElementById('height').value);
+  const w = parseFloat(document.getElementById('weight').value);
+  if (h && w) {
+    const bmi = (w / ((h/100)**2)).toFixed(1);
+    document.getElementById('bmi').value = bmi + (bmi<18.5?' (저체중)':bmi<25?' (정상)':bmi<30?' (과체중)':' (비만)');
+  }
+}
+
+function createChips(containerId, options, stateKey, max) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = options.map(o => `<div class="chip" data-value="${o}">${o}</div>`).join('');
+  el.querySelectorAll('.chip').forEach(chip => {
+    chip.onclick = () => {
+      const val = chip.dataset.value;
+      if (val === '없음') { state[stateKey] = []; el.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected')); chip.classList.add('selected'); return; }
+      el.querySelector('[data-value="없음"]')?.classList.remove('selected');
+      state[stateKey] = state[stateKey].filter(v=>v!=='없음');
+      if (chip.classList.contains('selected')) {
+        chip.classList.remove('selected'); state[stateKey] = state[stateKey].filter(v=>v!==val);
+      } else if (state[stateKey].length < max) {
+        chip.classList.add('selected'); state[stateKey].push(val);
+      }
+    };
+  });
+}
+
+// ══════════════════════════════════════════════════════════════
+// 복용 약물 & 드럭머거
+// ══════════════════════════════════════════════════════════════
+function addMedication() {
+  const input = document.getElementById('med-name');
+  const name = input.value.trim();
+  if (!name) return;
+  state.medications.push(name);
+  input.value = '';
+  renderMedications();
+  analyzeDrugMuggers();
+}
+
+function removeMed(idx) {
+  state.medications.splice(idx, 1);
+  renderMedications();
+  analyzeDrugMuggers();
+}
+
+function renderMedications() {
+  const ul = document.getElementById('med-list');
+  ul.innerHTML = state.medications.map((m,i) => `<li>${m}<button onclick="removeMed(${i})">✕</button></li>`).join('');
+}
+
+function analyzeDrugMuggers() {
+  state.drugMuggerResults = [];
+  for (const mugger of DRUG_MUGGERS) {
+    for (const med of state.medications) {
+      const medLow = med.toLowerCase();
+      if (mugger.drugs.some(d => medLow.includes(d.toLowerCase()) || d.toLowerCase().includes(medLow.split(' ')[0]))) {
+        for (const dep of mugger.depleted) {
+          if (!state.drugMuggerResults.find(r => r.nutrient === dep.n && r.drug === med)) {
+            state.drugMuggerResults.push({drug: med, nutrient: dep.n, reason: dep.reason, rec: dep.rec});
+          }
+        }
+      }
+    }
+  }
+  const panel = document.getElementById('drugmugger-panel');
+  const div = document.getElementById('drugmugger-results');
+  if (state.drugMuggerResults.length) {
+    panel.style.display = '';
+    div.innerHTML = state.drugMuggerResults.map(r => {
+      const prod = PRODUCTS.find(p=>p.id===r.rec);
+      return `<div class="alert alert-warning">
+        <strong>🔔 ${r.drug}</strong> → <strong>${r.nutrient}</strong> 고갈<br>
+        <small>기전: ${r.reason}</small><br>
+        <small>권장 보충: ${prod?prod.name:r.rec}</small>
+      </div>`;
+    }).join('');
+  } else { panel.style.display = 'none'; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 혈액검사 분석
+// ══════════════════════════════════════════════════════════════
+function analyzeBloodTest() {
+  state.bloodAnalysis = [];
+  const gender = document.getElementById('gender').value;
+  for (const m of BLOOD_MARKERS) {
+    const val = parseFloat(document.getElementById('blood-'+m.id)?.value);
+    if (!val && val !== 0) continue;
+    state.bloodTests[m.name] = val;
+    const ranges = m.genderRanges ? (gender==='여성'?m.rangesF:m.rangesM) : m.ranges;
+    for (const r of ranges) {
+      if (val <= r.max) {
+        if (r.r || !['정상','적절','최적'].includes(r.s)) {
+          state.bloodAnalysis.push({marker:m.name, value:val, unit:m.unit, status:r.s, rec:r.r});
+        }
+        break;
+      }
+    }
+  }
+  const panel = document.getElementById('blood-analysis-panel');
+  const div = document.getElementById('blood-analysis-results');
+  if (state.bloodAnalysis.length) {
+    panel.style.display = '';
+    div.innerHTML = state.bloodAnalysis.map(a => {
+      const prod = PRODUCTS.find(p=>p.id===a.rec);
+      const cls = ['결핍','심한결핍','고갈','빈혈'].includes(a.status)?'danger':['경계','부족','경계부족','전당뇨','경도상승','경계상승'].includes(a.status)?'warning':'info';
+      return `<div class="alert alert-${cls}">
+        <strong>${a.marker}: ${a.value}${a.unit}</strong> → ${a.status}
+        ${a.rec && prod ? `<br><small>권장: ${prod.name}</small>` : ''}
+      </div>`;
+    }).join('');
+  } else { panel.style.display='none'; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 제품 선택
+// ══════════════════════════════════════════════════════════════
+let categoryFilter = 'all';
+
+function renderCategoryFilter() {
+  const el = document.getElementById('category-filter');
+  el.innerHTML = `<div class="chip selected" data-cat="all">전체</div>` +
+    CATEGORIES.map(c => `<div class="chip" data-cat="${c}">${c}</div>`).join('');
+  el.querySelectorAll('.chip').forEach(chip => {
+    chip.onclick = () => {
+      el.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+      chip.classList.add('selected');
+      categoryFilter = chip.dataset.cat;
+      renderProducts();
+    };
+  });
+}
+
+function renderProducts() {
+  const grid = document.getElementById('product-grid');
+  const filtered = categoryFilter === 'all' ? PRODUCTS : PRODUCTS.filter(p => p.cat.includes(categoryFilter));
+  grid.innerHTML = filtered.map(p => {
+    const sel = state.selectedProducts.includes(p.id);
+    const ingText = p.ing.slice(0,4).map(i=>`${i.n} ${i.a}${i.u}`).join(', ') + (p.ing.length>4?` 외 ${p.ing.length-4}종`:'');
+    return `<div class="product-card ${sel?'selected':''}" onclick="toggleProduct('${p.id}')">
+      <div class="name">${sel?'✅ ':''}${p.name}</div>
+      <div class="dose">1일 ${p.dose}</div>
+      <div class="tags">${p.cat.map(c=>`<span class="tag">${c}</span>`).join('')}</div>
+      <div class="ingredients-preview">${ingText}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('selected-count').textContent = `(${state.selectedProducts.length}개 선택)`;
+}
+
+function toggleProduct(id) {
+  const idx = state.selectedProducts.indexOf(id);
+  if (idx >= 0) state.selectedProducts.splice(idx, 1);
+  else state.selectedProducts.push(id);
+  renderProducts();
+}
+
+// ══════════════════════════════════════════════════════════════
+// 스크리닝 엔진
+// ══════════════════════════════════════════════════════════════
+function runScreening() {
+  const totals = {};
+  const gender = document.getElementById('gender').value;
+  const age = parseInt(document.getElementById('age').value) || 30;
+
+  // 1. 합산
+  for (const pid of state.selectedProducts) {
+    const p = PRODUCTS.find(x=>x.id===pid);
+    if (!p) continue;
+    for (const ing of p.ing) {
+      if (!totals[ing.n]) totals[ing.n] = {total:0, unit:ing.u, sources:[]};
+      totals[ing.n].total += ing.a;
+      totals[ing.n].sources.push({product:p.name, amount:ing.a});
+    }
+  }
+
+  // 2. UL/RDA 체크
+  const exceeded = [], warnings = [], duplicates = [], specials = [];
+  for (const [nutrient, data] of Object.entries(totals)) {
+    const ulInfo = UL[nutrient] || {};
+    let ul = ulInfo.ul || null;
+    let practical = ulInfo.practical || null;
+    let rda = ulInfo.rda || null;
+    let suppOnly = ulInfo.suppOnly || false;
+    let diet = ulInfo.diet || 0;
+
+    let checkTotal = suppOnly ? data.total : data.total + diet;
+    let limit = ul || practical;
+
+    data.rda = rda;
+    data.rdaPct = rda ? Math.round(data.total/rda*100) : null;
+    data.ul = ul;
+    data.ulPct = ul ? Math.round(checkTotal/ul*100) : null;
+    data.limit = limit;
+    data.practical = practical;
+
+    if (limit && checkTotal > limit) {
+      exceeded.push({nutrient, total:data.total, diet:suppOnly?0:diet, checkTotal, limit, limitType:ul?'UL':'실질적상한',
+        pct:Math.round(checkTotal/limit*100), tox:ulInfo.tox||'', note:ulInfo.note||'', sources:data.sources});
+    } else if (limit && checkTotal >= limit*0.8) {
+      warnings.push({nutrient, total:checkTotal, limit, pct:Math.round(checkTotal/limit*100), unit:data.unit});
+    }
+
+    if (data.sources.length > 1) {
+      duplicates.push({nutrient, total:data.total, unit:data.unit, count:data.sources.length, sources:data.sources});
+    }
+  }
+
+  // 3. 특수 체크
+  if (totals['칼슘'] && totals['철']) specials.push("💊 칼슘+철 동시 포함 → 최소 2시간 간격 분리 복용 필수");
+  const zn = totals['아연']?.total||0, cu = totals['구리']?.total||0;
+  if (zn >= 25 && cu < 1) specials.push(`⚠️ 아연 ${zn}mg(고용량) + 구리 ${cu}mg → 장기 복용 시 구리 결핍 위험`);
+  const biotin = totals['비오틴']?.total||0;
+  if (biotin >= 250) specials.push(`⚠️ 비오틴 ${biotin}mcg → 혈액검사 교란 가능. 검사 48시간 전 중단`);
+  const vd = totals['비타민D']?.total||0, ca = totals['칼슘']?.total||0;
+  if (vd >= 75 && ca >= 500) specials.push("⚠️ 비타민D 고용량 + 칼슘 고용량 → 고칼슘혈증 모니터링 필요");
+
+  // 은행잎 + 항응고제
+  const hasGinkgo = state.selectedProducts.some(id => ['MC-GINKGO','MC-MEMORY-PS'].includes(id));
+  const hasAnticoag = state.medications.some(m => /와파린|아스피린|클로피도그렐|리바록사반/.test(m));
+  if (hasGinkgo && hasAnticoag) specials.push("🚨 은행잎 + 항응고제 → 출혈 위험 증가! 병용 재고 필요");
+
+  // 레보티록신 + 미네랄
+  const hasLevo = state.medications.some(m => /레보티록신|씬지로이드|갑상선/.test(m));
+  const hasMinerals = ['칼슘','철','마그네슘','아연'].filter(n=>totals[n]);
+  if (hasLevo && hasMinerals.length) specials.push(`⚠️ 레보티록신 + ${hasMinerals.join(',')} → 레보티록신 복용 후 4시간 간격!`);
+
+  // 혈당엔바나바 + 당뇨약
+  if (state.selectedProducts.includes('MC-BLOOD-SUGAR') && state.medications.some(m=>/메트포르민|인슐린|글리메피리드/.test(m)))
+    specials.push("⚠️ 혈당엔바나바(크롬400mcg) + 당뇨약 → 저혈당 위험. 혈당 모니터링 강화");
+
+  state.screeningResult = {totals, exceeded, warnings, duplicates, specials};
+  renderScreening();
+}
+
+function renderScreening() {
+  const r = state.screeningResult;
+  const alertDiv = document.getElementById('screening-alerts');
+  let html = '';
+
+  if (r.exceeded.length) {
+    html += `<div class="card" style="border-left:4px solid var(--danger)"><h3 style="color:var(--danger)">🚨 상한섭취량 초과 ${r.exceeded.length}건</h3>`;
+    for (const e of r.exceeded) {
+      html += `<div class="alert alert-danger">
+        <strong>${e.nutrient}</strong>: 보충제 합산 ${e.total}${r.totals[e.nutrient].unit}
+        ${e.diet?` + 식이 ~${e.diet}`:''} = ${e.checkTotal}${r.totals[e.nutrient].unit}<br>
+        <strong>${e.limitType}: ${e.limit}${r.totals[e.nutrient].unit} (${e.pct}%)</strong><br>
+        ${e.tox?`<small>과잉 시: ${e.tox}</small><br>`:''}
+        <small>출처: ${e.sources.map(s=>`${s.product}(${s.amount})`).join(' + ')}</small>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  if (r.warnings.length) {
+    html += `<div class="card" style="border-left:4px solid var(--warning)"><h3 style="color:#92400e">⚠️ 상한량 근접 (80%이상)</h3>`;
+    for (const w of r.warnings) html += `<div class="alert alert-warning">${w.nutrient}: ${w.total}${w.unit} (${w.limit}의 ${w.pct}%)</div>`;
+    html += '</div>';
+  }
+
+  if (r.specials.length) {
+    html += `<div class="card" style="border-left:4px solid var(--info)"><h3>⚠️ 특수 주의사항</h3>`;
+    for (const s of r.specials) html += `<div class="alert alert-info">${s}</div>`;
+    html += '</div>';
+  }
+
+  if (!r.exceeded.length && !r.warnings.length && !r.specials.length) {
+    html += `<div class="alert alert-success" style="font-size:16px;padding:20px">✅ 선택된 조합에서 상한량 초과 및 주요 주의사항이 없습니다.</div>`;
+  }
+
+  alertDiv.innerHTML = html;
+
+  // 테이블
+  const tbody = document.getElementById('screening-tbody');
+  tbody.innerHTML = '';
+  for (const [n, d] of Object.entries(r.totals).sort((a,b)=>a[0].localeCompare(b[0]))) {
+    const limit = d.ul || d.practical;
+    let status, statusClass;
+    if (limit && d.total > limit) { status = '🔴 초과'; statusClass = 'status-exceed'; }
+    else if (limit && d.total >= limit*0.8) { status = '🟡 주의'; statusClass = 'status-warn'; }
+    else if (d.sources.length > 1) { status = '📌 중복'; statusClass = 'status-dup'; }
+    else { status = '✅'; statusClass = 'status-ok'; }
+
+    const rdaStr = d.rdaPct ? d.rdaPct+'%' : '-';
+    const ulStr = d.ulPct ? d.ulPct+'%' : (d.practical ? Math.round(d.total/d.practical*100)+'%' : '-');
+    const srcStr = d.sources.map(s=>`${s.product}(${s.amount})`).join(', ');
+
+    // Progress bar
+    const pctVal = d.ulPct || (d.practical ? Math.round(d.total/d.practical*100) : 0);
+    const pctClass = pctVal > 100 ? 'progress-danger' : pctVal >= 80 ? 'progress-warn' : 'progress-ok';
+
+    tbody.innerHTML += `<tr>
+      <td><strong>${n}</strong></td>
+      <td>${d.total}${pctVal?`<div class="progress-bar"><div class="progress-fill ${pctClass}" style="width:${Math.min(pctVal,150)}%"></div></div>`:''}</td>
+      <td>${d.unit}</td>
+      <td>${rdaStr}</td>
+      <td>${ulStr}</td>
+      <td><span class="${statusClass}">${status}</span></td>
+      <td style="font-size:11px">${srcStr}</td>
+    </tr>`;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 보고서 생성
+// ══════════════════════════════════════════════════════════════
+function generateReport() {
+  const gender = document.getElementById('gender').value;
+  const age = document.getElementById('age').value || '?';
+  const bmi = document.getElementById('bmi').value || '-';
+  const r = state.screeningResult;
+  const div = document.getElementById('report-content');
+
+  let html = `<div class="card"><h3 style="font-size:18px">📋 메디코치 약사 상담 보고서</h3>
+    <p style="color:var(--text-secondary);font-size:13px">생성일: ${new Date().toLocaleDateString('ko-KR')}</p></div>`;
+
+  // 고객 정보
+  const intakeMemo = document.getElementById('intake-memo')?.value || '';
+  const currentSupps = document.getElementById('current-supplements')?.value || '';
+  html += `<div class="card"><h3>👤 고객 정보</h3>
+    <p>${gender} / ${age}세 / BMI ${bmi}</p>
+    ${state.selectedConcerns.length?`<p><strong>관리 분야:</strong> ${state.selectedConcerns.join(', ')}</p>`:''}
+    ${state.selectedConditions.length?`<p><strong>기저질환:</strong> ${state.selectedConditions.join(', ')}</p>`:''}
+    ${state.medications.length?`<p><strong>복용 약물:</strong> ${state.medications.join(', ')}</p>`:''}
+    ${intakeMemo?`<p><strong>상담 목적:</strong> ${intakeMemo}</p>`:''}
+    ${currentSupps?`<p><strong>기존 복용 건기식:</strong> ${currentSupps}</p>`:''}
+  </div>`;
+
+  // 드럭머거
+  if (state.drugMuggerResults.length) {
+    html += `<div class="card"><h3>🔔 드럭머거 분석</h3>`;
+    for (const r of state.drugMuggerResults) {
+      const prod = PRODUCTS.find(p=>p.id===r.rec);
+      html += `<div class="alert alert-warning"><strong>${r.drug}</strong> → ${r.nutrient} 고갈<br><small>${r.reason}</small><br><small>권장: ${prod?.name||''}</small></div>`;
+    }
+    html += '</div>';
+  }
+
+  // 혈액검사
+  if (state.bloodAnalysis.length) {
+    html += `<div class="card"><h3>🔬 혈액검사 분석</h3>`;
+    for (const a of state.bloodAnalysis) {
+      html += `<div class="alert alert-info">${a.marker}: ${a.value}${a.unit} → <strong>${a.status}</strong></div>`;
+    }
+    html += '</div>';
+  }
+
+  // 선택 제품 & 스크리닝
+  html += `<div class="card"><h3>📦 선택 제품</h3>`;
+  for (const pid of state.selectedProducts) {
+    const p = PRODUCTS.find(x=>x.id===pid);
+    html += `<p>• <strong>${p.name}</strong> (1일 ${p.dose})</p>`;
+  }
+  html += '</div>';
+
+  // 스크리닝 결과
+  if (r) {
+    if (r.exceeded.length) {
+      html += `<div class="card" style="border-left:4px solid var(--danger)"><h3 style="color:var(--danger)">🚨 상한량 초과 경고</h3>`;
+      for (const e of r.exceeded) {
+        html += `<div class="alert alert-danger"><strong>${e.nutrient}</strong>: ${e.total}${r.totals[e.nutrient].unit} (${e.limitType} ${e.limit}의 ${e.pct}%)<br><small>출처: ${e.sources.map(s=>s.product+'('+s.amount+')').join(' + ')}</small>${e.tox?'<br><small>과잉 시: '+e.tox+'</small>':''}</div>`;
+      }
+      html += '</div>';
+    }
+
+    if (r.duplicates.length) {
+      html += `<div class="card"><h3>💊 중복 성분 (${r.duplicates.length}건)</h3><table class="screening-table"><thead><tr><th>영양소</th><th>합산</th><th>중복수</th><th>출처</th></tr></thead><tbody>`;
+      for (const d of r.duplicates) {
+        html += `<tr><td>${d.nutrient}</td><td>${d.total}${d.unit}</td><td>${d.count}개</td><td style="font-size:11px">${d.sources.map(s=>s.product+'('+s.amount+')').join(', ')}</td></tr>`;
+      }
+      html += '</tbody></table></div>';
+    }
+
+    if (r.specials.length) {
+      html += `<div class="card"><h3>⚠️ 주의사항</h3>`;
+      for (const s of r.specials) html += `<div class="alert alert-warning">${s}</div>`;
+      html += '</div>';
+    }
+  }
+
+  // 복용 시간표
+  html += `<div class="card"><h3>⏰ 권장 복용 시간표</h3><div class="timing-card">`;
+  const timing = generateTiming();
+  for (const [time, items] of Object.entries(timing)) {
+    if (items.length) html += `<div class="timing-slot"><h5>${time}</h5><ul>${items.map(i=>'<li>• '+i+'</li>').join('')}</ul></div>`;
+  }
+  html += '</div></div>';
+
+  // 약사 수기 입력란
+  html += `<div class="card">
+    <h3>✏️ 약사 상담 소견</h3>
+    <div class="form-group">
+      <label>상담 중 특이사항 / 고객 호소 내용</label>
+      <textarea id="rpt-chief-complaint" rows="3" placeholder="예: 최근 3개월간 피로감 심화, 오후에 특히 졸림 호소. 식사 불규칙하고 야식 잦음."></textarea>
+    </div>
+    <div class="form-group">
+      <label>약사 종합 소견</label>
+      <textarea id="rpt-pharmacist-opinion" rows="4" placeholder="예: 메트포르민+PPI 이중 드럭머거로 B12/Mg 결핍 위험 높음. 혈당 전단계이므로 생활습관 개선이 우선. 3개월 후 혈액검사 재평가 필요."></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>추천 조합 조정 사유 (자동 추천과 다르게 변경한 경우)</label>
+        <textarea id="rpt-adjustment" rows="2" placeholder="예: 마그네슘 400mg → 안티스트레스(94.5mg)로 대체. 수면 문제도 있어 테아닌 병용이 더 적합하다고 판단."></textarea>
+      </div>
+      <div class="form-group">
+        <label>추가 권고사항 / 생활습관 지도</label>
+        <textarea id="rpt-lifestyle-advice" rows="2" placeholder="예: 카페인 오후 2시 이전으로 제한, 식후 15분 걷기, 음주 주 1회 이하로 절제 권고."></textarea>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>처방의 상의 필요 사항</label>
+        <textarea id="rpt-doctor-consult" rows="2" placeholder="예: PPI 장기 복용 감량/대체 여부 처방의와 상의 권유. B12 주사 보충 고려 요청."></textarea>
+      </div>
+      <div class="form-group">
+        <label>다음 상담 / 추적 검사 계획</label>
+        <textarea id="rpt-followup-plan" rows="2" placeholder="예: 3개월 후 비타민D, B12, 페리틴, HbA1c 재검사. 1개월 후 전화 상담으로 복용 순응도 확인."></textarea>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>상담 약사</label>
+      <div class="form-row">
+        <input type="text" id="rpt-pharmacist-name" placeholder="약사 이름">
+        <input type="date" id="rpt-consult-date" value="${new Date().toISOString().split('T')[0]}">
+      </div>
+    </div>
+  </div>`;
+
+  html += `<div class="card" style="background:#f8fafc"><p style="font-size:12px;color:var(--text-secondary)">
+    ※ 본 보고서는 약사 상담 보조 자료이며, 최종 판단은 상담 약사가 합니다.<br>
+    ※ 의약품 복용 중인 경우 처방의와 상의를 권장합니다.<br>
+    ※ 메디코치 자체 앱의 건강검진 결과 및 복약이력 분석 기능도 함께 활용하세요.
+  </p></div>`;
+
+  div.innerHTML = html;
+}
+
+function generateTiming() {
+  const hasLevo = state.medications.some(m=>/레보티록신|씬지로이드/.test(m));
+  const timing = {'아침(식사 중)':[], '점심(식사 중)':[], '저녁(식사 중)':[], '취침 전':[]};
+
+  for (const pid of state.selectedProducts) {
+    const p = PRODUCTS.find(x=>x.id===pid);
+    if (!p) continue;
+    if (['MC-MAG400','MC-ANTI-STRESS'].includes(pid)) timing['취침 전'].push(p.name);
+    else if (pid === 'MC-HEM-IRON') timing['점심(식사 중)'].push(p.name + ' (식간, 비타민C와 함께)');
+    else if (pid === 'MC-BONE') {
+      if (hasLevo) timing['점심(식사 중)'].push(p.name + ' (레보티록신 4시간 후)');
+      else timing['점심(식사 중)'].push(p.name);
+    }
+    else if (pid === 'MC-MILKTHISTLE') timing['저녁(식사 중)'].push(p.name);
+    else if (pid === 'MC-PROBIOTICS') timing['아침(식사 중)'].push(p.name + ' (공복 또는 식전)');
+    else timing['아침(식사 중)'].push(p.name);
+  }
+
+  if (hasLevo) timing['기상 직후(공복)'] = ['레보티록신 (기존 처방약)'];
+  return timing;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 저장 / 불러오기 / 내보내기
+// ══════════════════════════════════════════════════════════════
+const STORAGE_KEY = 'medicoach_consultations';
+
+function collectAllData() {
+  return {
+    id: Date.now(),
+    savedAt: new Date().toISOString(),
+    patient: {
+      gender: document.getElementById('gender').value,
+      age: document.getElementById('age').value,
+      bmi: document.getElementById('bmi').value,
+      pregnancy: document.getElementById('pregnancy')?.value || '해당 없음',
+      menopause: document.getElementById('menopause')?.value || '해당 없음',
+    },
+    concerns: [...state.selectedConcerns],
+    conditions: [...state.selectedConditions],
+    allergies: [...state.selectedAllergies],
+    medications: [...state.medications],
+    bloodTests: {...state.bloodTests},
+    selectedProducts: [...state.selectedProducts],
+    drugMuggerResults: state.drugMuggerResults,
+    bloodAnalysis: state.bloodAnalysis,
+    lifestyle: {
+      sleep: document.getElementById('sleep').value,
+      exercise: document.getElementById('exercise').value,
+      alcohol: document.getElementById('alcohol').value,
+      smoking: document.getElementById('smoking').value,
+      sun: document.getElementById('sun').value,
+      stress: document.getElementById('stress').value,
+    },
+    notes: {
+      intakeMemo: document.getElementById('intake-memo')?.value || '',
+      currentSupplements: document.getElementById('current-supplements')?.value || '',
+      chiefComplaint: document.getElementById('rpt-chief-complaint')?.value || '',
+      pharmacistOpinion: document.getElementById('rpt-pharmacist-opinion')?.value || '',
+      adjustment: document.getElementById('rpt-adjustment')?.value || '',
+      lifestyleAdvice: document.getElementById('rpt-lifestyle-advice')?.value || '',
+      doctorConsult: document.getElementById('rpt-doctor-consult')?.value || '',
+      followupPlan: document.getElementById('rpt-followup-plan')?.value || '',
+      pharmacistName: document.getElementById('rpt-pharmacist-name')?.value || '',
+      consultDate: document.getElementById('rpt-consult-date')?.value || '',
+    },
+    screeningResult: state.screeningResult,
+    reportHtml: document.getElementById('report-content')?.innerHTML || '',
+  };
+}
+
+function saveConsultation() {
+  const data = collectAllData();
+  const gender = data.patient.gender;
+  const age = data.patient.age;
+  const concerns = data.concerns.slice(0,2).join(',');
+  data.label = `${gender}/${age}세 - ${concerns || '상담'}`;
+
+  let saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  // 같은 id면 덮어쓰기
+  const idx = saved.findIndex(s => s.id === data.id);
+  if (idx >= 0) saved[idx] = data;
+  else saved.unshift(data);
+  // 최대 100건
+  if (saved.length > 100) saved = saved.slice(0, 100);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+
+  alert(`✅ 상담이 저장되었습니다!\n\n"${data.label}"\n\n📂 저장 목록 탭에서 확인 가능합니다.\n\n💡 다른 PC에서도 보려면 '파일 내보내기' 또는 '전체 백업'을 사용하세요.`);
+  renderSavedList();
+}
+
+function exportConsultation() {
+  const data = collectAllData();
+  const gender = data.patient.gender;
+  const age = data.patient.age;
+  const date = new Date().toISOString().split('T')[0];
+  const filename = `메디코치_상담_${gender}${age}세_${date}.json`;
+  downloadJSON(data, filename);
+}
+
+function exportAllConsultations() {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  if (!saved.length) { alert('저장된 상담이 없습니다.'); return; }
+  const date = new Date().toISOString().split('T')[0];
+  downloadJSON(saved, `메디코치_전체백업_${date}.json`);
+  alert(`✅ ${saved.length}건의 상담 데이터를 내보냈습니다.\n\n이 파일을 OneDrive/Google Drive에 저장하면 다른 PC에서도 불러올 수 있습니다.`);
+}
+
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importConsultation(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      let saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+
+      if (Array.isArray(data)) {
+        // 전체 백업 불러오기
+        let imported = 0;
+        for (const item of data) {
+          if (!saved.find(s => s.id === item.id)) {
+            saved.unshift(item);
+            imported++;
+          }
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(saved.slice(0, 100)));
+        alert(`✅ ${imported}건 불러오기 완료! (중복 ${data.length - imported}건 건너뜀)`);
+      } else {
+        // 개별 상담 불러오기
+        if (!saved.find(s => s.id === data.id)) {
+          saved.unshift(data);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(saved.slice(0, 100)));
+        }
+        loadConsultation(data);
+        alert('✅ 상담 데이터를 불러왔습니다!');
+      }
+      renderSavedList();
+    } catch(err) {
+      alert('❌ 파일 형식이 올바르지 않습니다.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function loadConsultation(data) {
+  // 폼에 데이터 복원
+  if (data.patient) {
+    document.getElementById('gender').value = data.patient.gender || '여성';
+    document.getElementById('gender').dispatchEvent(new Event('change'));
+    document.getElementById('age').value = data.patient.age || '';
+    document.getElementById('bmi').value = data.patient.bmi || '';
+    if (data.patient.pregnancy) document.getElementById('pregnancy').value = data.patient.pregnancy;
+    if (data.patient.menopause) document.getElementById('menopause').value = data.patient.menopause;
+  }
+  // 관리분야
+  state.selectedConcerns = data.concerns || [];
+  document.querySelectorAll('#concerns-chips .chip').forEach(c => {
+    c.classList.toggle('selected', state.selectedConcerns.includes(c.dataset.value));
+  });
+  // 기저질환
+  state.selectedConditions = data.conditions || [];
+  document.querySelectorAll('#conditions-chips .chip').forEach(c => {
+    c.classList.toggle('selected', state.selectedConditions.includes(c.dataset.value));
+  });
+  // 알레르기
+  state.selectedAllergies = data.allergies || [];
+  document.querySelectorAll('#allergy-chips .chip').forEach(c => {
+    c.classList.toggle('selected', state.selectedAllergies.includes(c.dataset.value));
+  });
+  // 약물
+  state.medications = data.medications || [];
+  renderMedications();
+  analyzeDrugMuggers();
+  // 혈액검사
+  state.bloodTests = data.bloodTests || {};
+  for (const m of BLOOD_MARKERS) {
+    const el = document.getElementById('blood-'+m.id);
+    if (el && data.bloodTests[m.name] != null) el.value = data.bloodTests[m.name];
+  }
+  // 제품
+  state.selectedProducts = data.selectedProducts || [];
+  renderProducts();
+  // 생활습관
+  if (data.lifestyle) {
+    for (const [k,v] of Object.entries(data.lifestyle)) {
+      const el = document.getElementById(k);
+      if (el) { el.value = v; if (k==='stress') document.getElementById('stress-val').textContent = v; }
+    }
+  }
+  // 메모
+  if (data.notes) {
+    const map = {
+      intakeMemo:'intake-memo', currentSupplements:'current-supplements',
+      chiefComplaint:'rpt-chief-complaint', pharmacistOpinion:'rpt-pharmacist-opinion',
+      adjustment:'rpt-adjustment', lifestyleAdvice:'rpt-lifestyle-advice',
+      doctorConsult:'rpt-doctor-consult', followupPlan:'rpt-followup-plan',
+      pharmacistName:'rpt-pharmacist-name', consultDate:'rpt-consult-date',
+    };
+    for (const [key, elId] of Object.entries(map)) {
+      const el = document.getElementById(elId);
+      if (el && data.notes[key]) el.value = data.notes[key];
+    }
+  }
+  goTab('intake');
+}
+
+function deleteConsultation(id) {
+  if (!confirm('이 상담 기록을 삭제하시겠습니까?')) return;
+  let saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  saved = saved.filter(s => s.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saved));
+  renderSavedList();
+}
+
+function renderSavedList() {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const div = document.getElementById('saved-list');
+  if (!saved.length) {
+    div.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:40px">저장된 상담이 없습니다.<br><br>상담 보고서 탭에서 💾 상담 저장을 누르거나,<br>📥 파일 불러오기로 이전 상담을 가져오세요.</p>';
+    return;
+  }
+  div.innerHTML = `<p style="margin-bottom:12px;color:var(--text-secondary)">${saved.length}건의 상담 기록</p>` +
+    saved.map(s => {
+      const date = new Date(s.savedAt).toLocaleDateString('ko-KR', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const products = (s.selectedProducts||[]).map(id => {
+        const p = PRODUCTS.find(x=>x.id===id);
+        return p ? p.name : id;
+      }).slice(0,3).join(', ');
+      const meds = (s.medications||[]).join(', ');
+      return `<div class="card" style="padding:14px;cursor:pointer" onclick="loadConsultation(${JSON.stringify(s).replace(/"/g,'&quot;')})">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <strong>${s.label || s.patient?.gender+'/'+s.patient?.age+'세'}</strong>
+            <span style="font-size:12px;color:var(--text-secondary);margin-left:8px">${date}</span>
+            ${meds ? `<div style="font-size:12px;color:#dc2626;margin-top:4px">💊 ${meds}</div>` : ''}
+            ${products ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:2px">📦 ${products}${(s.selectedProducts||[]).length>3?' 외':''}  </div>` : ''}
+            ${s.notes?.pharmacistOpinion ? `<div style="font-size:11px;color:var(--info);margin-top:2px">📝 ${s.notes.pharmacistOpinion.substring(0,50)}...</div>` : ''}
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn" style="padding:6px 10px;font-size:12px;background:#6366f1;color:#fff" onclick="event.stopPropagation();downloadJSON(${JSON.stringify(s).replace(/"/g,'&quot;')},'상담_${(s.label||'').replace(/[^가-힣a-zA-Z0-9]/g,'_')}.json')">📤</button>
+            <button class="btn" style="padding:6px 10px;font-size:12px;background:#dc2626;color:#fff" onclick="event.stopPropagation();deleteConsultation(${s.id})">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+// 초기화 실행
+init();
+renderSavedList();
+</script>
+</body>
+</html>
