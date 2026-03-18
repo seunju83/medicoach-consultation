@@ -153,7 +153,8 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); outline
   <div class="tab" data-tab="products">4. 제품 선택</div>
   <div class="tab" data-tab="screening">5. 스크리닝</div>
   <div class="tab" data-tab="report">6. 상담 보고서</div>
-  <div class="tab" data-tab="saved" style="margin-left:auto;color:#6366f1">📂 저장 목록</div>
+  <div class="tab" data-tab="scenarios" style="margin-left:auto;color:#16a34a">📖 시나리오</div>
+  <div class="tab" data-tab="saved" style="color:#6366f1">📂 저장 목록</div>
 </div>
 
 <div class="main">
@@ -377,6 +378,21 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); outline
     <button class="btn btn-primary" style="background:#16a34a" onclick="saveConsultation()">💾 상담 저장</button>
     <button class="btn btn-primary" style="background:#6366f1" onclick="exportConsultation()">📤 파일 내보내기</button>
     <button class="btn btn-outline" onclick="goTab('intake')">새 상담 시작</button>
+  </div>
+</div>
+
+<!-- ===================== 시나리오 브라우저 ===================== -->
+<div class="section" id="sec-scenarios">
+  <div class="card">
+    <h3>📖 상담 시나리오 (32건)</h3>
+    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px">
+      시나리오를 선택하면 고객 정보·약물·혈액검사·추천 제품이 자동 입력됩니다.<br>
+      약사가 내용을 검토/수정한 후 스크리닝을 실행하세요.
+    </p>
+    <div class="form-group">
+      <input type="text" id="scenario-search" placeholder="🔍 시나리오 검색 (예: 당뇨, 임신, 간, 스타틴...)" oninput="filterScenarios()">
+    </div>
+    <div id="scenario-list"></div>
   </div>
 </div>
 
@@ -1277,9 +1293,237 @@ function renderSavedList() {
     }).join('');
 }
 
+// ══════════════════════════════════════════════════════════════
+// 시나리오 브라우저 & 적용
+// ══════════════════════════════════════════════════════════════
+const SCENARIOS = [
+{id:"SC-001",title:"30대 여성 만성 피로 + VitD 결핍",gender:"여성",age:32,
+ conditions:[],medications:[],
+ essential:["MC-VITD","MC-HEM-IRON","MC-MULTI"],optional:["MC-VITC"],
+ analysis:"비타민D 심한 결핍 + 철결핍성 빈혈. 실내근무, 불규칙 식사가 원인.",
+ alerts:"엽산 합산 1200mcg→UL 1000 초과주의. 철 37mg(UL 45 이내)"},
+{id:"SC-002",title:"50대 남성 고혈압+고지혈 + 스타틴/ARB",gender:"남성",age:55,
+ conditions:["고혈압","이상지질혈증"],medications:["로수바스타틴 10mg","텔미사르탄 40mg","아스피린 100mg"],
+ essential:["MC-OMEGA3","MC-COQ10","MC-VITD","MC-MULTI"],optional:[],
+ analysis:"스타틴→CoQ10 고갈, ARB→아연 고갈 드럭머거. 중성지방↑, HDL↓.",
+ alerts:"비타민E 합산 22mg. 아스피린+오메가3 출혈 모니터링"},
+{id:"SC-003",title:"40대 여성 당뇨전단계 + 메트포르민 + PPI",gender:"여성",age:45,
+ conditions:["당뇨병(2형)","위식도역류질환(GERD)"],medications:["메트포르민 500mg","판토프라졸 40mg"],
+ essential:["MC-MULTI","MC-VITD","MC-MAG400","MC-BLOOD-SUGAR"],optional:["MC-BONE","MC-HEM-IRON"],
+ analysis:"메트포르민→B12고갈, PPI→Mg/Ca/Fe/B12 다중 고갈. 당뇨전단계 관리 필요.",
+ alerts:"마그네슘 합산 494.5mg→UL 350 초과! 나이아신 30mg(UL 35 근접). 크롬 430mcg"},
+{id:"SC-004",title:"60대 여성 골다공증 + 레보티록신",gender:"여성",age:63,
+ conditions:["골다공증","갑상선기능저하증"],medications:["레보티록신 100mcg","알렌드로네이트 70mg(주1회)"],
+ essential:["MC-VITD","MC-BONE","MC-MULTI"],optional:["MC-JOINT-MSM"],
+ analysis:"비타민D 부족 + 골다공증. 레보티록신과 미네랄 4시간 간격 필수!",
+ alerts:"비타민D 합산 70mcg(+MSM시 95mcg, UL 100 근접!). 칼슘 510mg. 레보티록신 복용 간격 핵심"},
+{id:"SC-005",title:"20대 여성 임신 준비 + OCP 중단 예정",gender:"여성",age:29,
+ conditions:[],medications:["경구피임약"],
+ essential:["MC-HEM-IRON","MC-VITD","MC-OMEGA3","MC-MULTI"],optional:["MC-MAG400"],
+ analysis:"OCP 드럭머거(B6,엽산,Mg,Zn). 엽산 사전보충 필수. 비타민A 고용량 금기!",
+ alerts:"엽산 합산 1200mcg(UL 1000). 임신 준비시 고용량 엽산은 의사와 상의"},
+{id:"SC-006",title:"70대 남성 전립선 + 다약제 + 인지",gender:"남성",age:72,
+ conditions:["고혈압","이상지질혈증","전립선비대증"],medications:["암로디핀 5mg","아토르바스타틴 20mg","탐스로신 0.2mg"],
+ essential:["MC-VITD","MC-MULTI","MC-COQ10","MC-SAW-PALMETTO"],optional:["MC-MEMORY-PS","MC-LUTEIN"],
+ analysis:"스타틴→CoQ10 고갈. 전립선+인지+눈 복합 고령 남성.",
+ alerts:"아연 합산 42mg(쏘팔25+루테인8.5+멀티8.5)→UL 35 초과! 쏘팔+루테인 병용 시 아연 주의"},
+{id:"SC-007",title:"30대 남성 운동인",gender:"남성",age:32,
+ conditions:[],medications:[],
+ essential:["MC-VITD","MC-MAG400","MC-OMEGA3"],optional:["MC-RED-GINSENG"],
+ analysis:"고강도 운동시 Mg/Zn 소모↑. 비타민D 40ng/mL이상 목표.",
+ alerts:"마그네슘 400mg(UL 350, 보충제 기준 초과). 비스글리시네이트는 설사 유발 적음"},
+{id:"SC-008",title:"40대 남성 음주 + 간수치 + 지방간",gender:"남성",age:44,
+ conditions:["지방간"],medications:[],
+ essential:["MC-MILKTHISTLE","MC-OMEGA3","MC-VITD"],optional:["MC-MULTI","MC-VITC"],
+ analysis:"간수치 상승 + 지방간 + 대사증후군 경향. 금주가 핵심!",
+ alerts:"멀티 추가 시 나이아신 30mg(UL 35 근접). 비타민C 합산 확인"},
+{id:"SC-009",title:"50대 여성 폐경 + SSRI",gender:"여성",age:53,
+ conditions:["우울증/불안장애","골감소증"],medications:["에스시탈로프람 10mg"],
+ essential:["MC-VITD","MC-MULTI","MC-BONE","MC-MAG400"],optional:["MC-OMEGA3","MC-ANTI-STRESS"],
+ analysis:"SSRI→엽산/B12 연관. 폐경후 골밀도↓. 세인트존스워트 절대금기!",
+ alerts:"마그네슘 합산 644.5mg(400+150+94.5)→UL 350 대폭초과! MAG400을 ANTI-STRESS로 대체 검토"},
+{id:"SC-010",title:"20대 여성 재발성 질염 + IBS",gender:"여성",age:26,
+ conditions:["과민성대장증후군(IBS)"],medications:[],
+ essential:["MC-PROBIOTICS","MC-VITD","MC-VITC"],optional:[],
+ analysis:"장내 미생물 교란 + 면역↓ + 질내 균총 불균형.",
+ alerts:"성분 중복 없음. 안전한 조합"},
+{id:"SC-011",title:"20대 남성 IT개발자 눈피로 + 수면부족",gender:"남성",age:27,
+ conditions:[],medications:[],
+ essential:["MC-LUTEIN","MC-ANTI-STRESS","MC-VITD"],optional:["MC-OMEGA3"],
+ analysis:"장시간 모니터 노출→눈피로/블루라이트. 수면부족→피로 악순환.",
+ alerts:"성분 중복 거의 없음. 안전한 조합"},
+{id:"SC-012",title:"30대 여성 교대근무 간호사 피로+빈혈",gender:"여성",age:33,
+ conditions:["빈혈"],medications:[],
+ essential:["MC-HEM-IRON","MC-VITD","MC-MULTI"],optional:["MC-MAG400","MC-PROBIOTICS"],
+ analysis:"교대근무→수면장애, 불규칙식사→빈혈, 면역↓.",
+ alerts:"엽산 합산 1200mcg→UL 1000 초과. 마그네슘 추가 시 494.5mg→UL 350 초과"},
+{id:"SC-013",title:"40대 여성 PMS + 생리통",gender:"여성",age:42,
+ conditions:[],medications:[],
+ essential:["MC-PMS","MC-MAG400"],optional:["MC-OMEGA3","MC-VITD"],
+ analysis:"GLA(감마리놀렌산)이 PMS 증상 완화. 마그네슘이 근경련/통증 완화.",
+ alerts:"마그네슘 400mg(UL 350 초과). 오메가3 추가시 비타민E 합산 22mg"},
+{id:"SC-014",title:"50대 남성 전립선비대증 + 탐스로신",gender:"남성",age:56,
+ conditions:["전립선비대증"],medications:["탐스로신 0.2mg"],
+ essential:["MC-SAW-PALMETTO","MC-VITD"],optional:["MC-LUTEIN"],
+ analysis:"쏘팔메토+옥타코사놀로 전립선 관리. 아연이 전립선 건강에 중요.",
+ alerts:"쏘팔 아연25mg+루테인8.5mg=33.5mg(UL 35 근접). 구리 보충 고려"},
+{id:"SC-015",title:"60대 남성 파킨슨 초기 + 레보도파",gender:"남성",age:65,
+ conditions:[],medications:["레보도파/카르비도파"],
+ essential:["MC-OMEGA3","MC-COQ10","MC-VITD"],optional:[],
+ analysis:"레보도파+카르비도파 병용시 B6 표준용량(~50mg)까지 안전. CoQ10 미토콘드리아 지원.",
+ alerts:"⚠️ 판토비오틴(B6 10mg) 병용 시 주의! 레보도파 단독이면 B6 금기"},
+{id:"SC-016",title:"30대 여성 다이어트 + BMI 28 + 혈당 경계",gender:"여성",age:34,
+ conditions:[],medications:[],
+ essential:["MC-DIET","MC-BLOOD-SUGAR"],optional:["MC-PROBIOTICS","MC-VITD"],
+ analysis:"HCA(가르시니아)로 지방합성↓ + 크롬/바나바로 혈당 관리.",
+ alerts:"크롬 합산 400mcg. 비타민B2 합산 2.8mg. 셀렌 200mcg(UL 400의 50%)"},
+{id:"SC-017",title:"70대 여성 다약제 5종 + 낙상위험",gender:"여성",age:75,
+ conditions:["고혈압","이상지질혈증","골다공증"],medications:["암로디핀 5mg","로수바스타틴 5mg","알렌드로네이트 70mg(주1회)","오메프라졸 20mg","아스피린 100mg"],
+ essential:["MC-VITD","MC-BONE"],optional:["MC-MAG400"],
+ analysis:"5종 다약제→상호작용 최소화 필수. PPI→Mg/Ca/B12 고갈. 스타틴→CoQ10.",
+ alerts:"비타민D 60mcg(UL 100이내). 마그네슘 추가시 550mg→UL 350 대폭초과. 비스포스포네이트 복용간격 핵심"},
+{id:"SC-018",title:"40대 남성 NAFLD + 음주 + TG 높음",gender:"남성",age:44,
+ conditions:["지방간"],medications:[],
+ essential:["MC-MILKTHISTLE","MC-OMEGA3","MC-VITD"],optional:["MC-MULTI","MC-VITC"],
+ analysis:"밀크씨슬(실리마린)→간보호. 오메가3→TG↓. 금주가 가장 중요!",
+ alerts:"멀티 추가시 나이아신 30mg. B군 중복. 비타민C 합산 확인"},
+{id:"SC-019",title:"50대 여성 류마티스관절염 + MTX",gender:"여성",age:52,
+ conditions:["관절염"],medications:["메토트렉세이트(MTX)"],
+ essential:["MC-VITD","MC-OMEGA3","MC-JOINT-MSM"],optional:["MC-HEM-IRON"],
+ analysis:"MTX→엽산 고갈(보통 엽산 보충 처방). 오메가3 항염. MSM 관절보호.",
+ alerts:"비타민D 합산 75mcg(VITD 50+MSM 25)→UL 100의 75%. 철분은 빈혈 확인 후"},
+{id:"SC-020",title:"20대 여성 비건 + 빈혈 + 피부트러블",gender:"여성",age:24,
+ conditions:["빈혈"],medications:[],
+ essential:["MC-HEM-IRON","MC-PANTO-BIOTIN","MC-VITD"],optional:["MC-PROBIOTICS"],
+ analysis:"비건→B12/철/아연 부족. 판토비오틴으로 피부+탈모+B군 보충.",
+ alerts:"🚨 엽산 합산 1400mcg(800+600)→UL 1000 대폭초과! 나이아신 50mg→UL 35초과! 아연 17mg. 비오틴 5000mcg→혈액검사 교란주의"},
+{id:"SC-021",title:"60대 남성 당뇨+스타틴+ACE억제제 다중드럭머거",gender:"남성",age:62,
+ conditions:["당뇨병(2형)","고혈압","이상지질혈증"],medications:["메트포르민 1000mg","아토르바스타틴 20mg","라미프릴 5mg"],
+ essential:["MC-MULTI","MC-COQ10","MC-BLOOD-SUGAR","MC-VITD"],optional:["MC-OMEGA3"],
+ analysis:"3중 드럭머거! 메트포르민→B12, 스타틴→CoQ10, ACE→아연.",
+ alerts:"아연 합산 20.5mg. 셀렌 합산 255mcg(UL 400의 64%). 크롬 430mcg. 나이아신 30mg. 저혈당 모니터링!"},
+{id:"SC-022",title:"30대 여성 하시모토갑상선염 + 레보티록신 + 탈모",gender:"여성",age:35,
+ conditions:["갑상선기능저하증"],medications:["레보티록신 100mcg"],
+ essential:["MC-PANTO-BIOTIN","MC-VITD"],optional:["MC-HEM-IRON"],
+ analysis:"하시모토→탈모. 판토비오틴(비오틴5000+판토텐산200)으로 모발건강.",
+ alerts:"⚠️ 레보티록신과 철/아연 4시간 간격 필수! 비오틴5000mcg→TSH검사 교란주의(48시간전 중단). 나이아신 50mg→UL 35초과"},
+{id:"SC-023",title:"40대 여성 GERD + PPI 5년 + 골다공증 걱정",gender:"여성",age:48,
+ conditions:["위식도역류질환(GERD)"],medications:["에소메프라졸 20mg"],
+ essential:["MC-VITD","MC-BONE","MC-MAG400"],optional:["MC-HEM-IRON","MC-MULTI"],
+ analysis:"PPI 5년→Mg/Ca/Fe/B12 다중 고갈. 칼슘시트레이트 선택(위산없이도 흡수).",
+ alerts:"마그네슘 합산 550mg(400+150)→UL 350 초과! 비타민D 60mcg. 철분 추가시 합산 주의"},
+{id:"SC-024",title:"50대 남성 통풍 + 이뇨제",gender:"남성",age:54,
+ conditions:["통풍"],medications:["HCTZ 12.5mg"],
+ essential:["MC-VITC","MC-MAG400"],optional:["MC-OMEGA3","MC-VITD"],
+ analysis:"이뇨제→Mg/Zn 고갈. 비타민C 500~1000mg이 요산↓에 도움.",
+ alerts:"마그네슘 400mg→UL 350 초과. 나이아신 고용량은 요산↑이므로 주의"},
+{id:"SC-025",title:"20대 남성 군복무 + 관절 + 면역",gender:"남성",age:22,
+ conditions:[],medications:[],
+ essential:["MC-JOINT-MSM","MC-VITD","MC-VITC"],optional:["MC-PROBIOTICS"],
+ analysis:"과도한 훈련→관절 부하. MSM+비타민D로 관절/뼈 보호.",
+ alerts:"비타민D 합산 75mcg(50+25)→UL 100의 75%. 비타민C 500mg(UL 2000 이내)"},
+{id:"SC-026",title:"40대 남성 만성스트레스 + 불면 + 혈압경계",gender:"남성",age:43,
+ conditions:[],medications:[],
+ essential:["MC-ANTI-STRESS","MC-MAG400","MC-OMEGA3"],optional:["MC-COQ10"],
+ analysis:"L-테아닌+홍경천→스트레스/수면. 마그네슘→근이완/수면. 오메가3→혈압.",
+ alerts:"마그네슘 합산 494.5mg(400+94.5)→UL 350 초과! MAG400 용량 조절 검토"},
+{id:"SC-027",title:"60대 여성 백내장수술후 + 황반변성예방",gender:"여성",age:66,
+ conditions:[],medications:[],
+ essential:["MC-LUTEIN","MC-OMEGA3","MC-VITD"],optional:["MC-VITC"],
+ analysis:"루테인+지아잔틴이 황반보호(AREDS2). 오메가3 DHA가 망막건강.",
+ alerts:"비타민E 합산 22mg(루테인+오메가3). 셀렌 합산 55mcg. 안전한 조합"},
+{id:"SC-028",title:"30대 남성 구취/잇몸출혈 + 흡연",gender:"남성",age:35,
+ conditions:[],medications:[],
+ essential:["MC-DENTAL","MC-VITC"],optional:["MC-PROBIOTICS"],
+ analysis:"흡연→비타민C 소모↑, 잇몸질환↑. 프로폴리스+비타민C로 구강건강.",
+ alerts:"비타민C 합산 550mg(500+50). 아연 8.5mg. 안전한 조합. 흡연자는 베타카로틴 보충제 회피"},
+{id:"SC-029",title:"50대 여성 골다공증 + 비스포스포네이트",gender:"여성",age:58,
+ conditions:["골다공증"],medications:["알렌드로네이트 70mg(주1회)"],
+ essential:["MC-VITD","MC-BONE"],optional:["MC-MAG400"],
+ analysis:"비스포스포네이트+칼슘/비타민D가 골다공증 표준치료. 복용 간격이 핵심!",
+ alerts:"마그네슘 추가시 550mg→UL 350 초과. 비타민D 60mcg. ⚠️ 알렌드로네이트 복용후 30분~2시간 미네랄 회피"},
+{id:"SC-030",title:"70대 남성 전립선+기억력+눈 복합고령",gender:"남성",age:74,
+ conditions:["전립선비대증"],medications:["탐스로신 0.2mg","아스피린 100mg"],
+ essential:["MC-SAW-PALMETTO","MC-MEMORY-PS","MC-LUTEIN","MC-VITD"],optional:[],
+ analysis:"전립선(쏘팔)+인지(PS+은행잎)+눈(루테인) 복합관리. 은행잎→항응고 주의!",
+ alerts:"🚨 아연 합산 33.5mg(쏘팔25+루테인8.5)→UL 35 근접. ⚠️ 기억엔PS(은행잎)+아스피린→출혈위험↑"},
+{id:"SC-031",title:"40대 여성 IBS + 면역력 + 피부",gender:"여성",age:41,
+ conditions:["과민성대장증후군(IBS)"],medications:[],
+ essential:["MC-PROBIOTICS","MC-VITD","MC-PANTO-BIOTIN"],optional:["MC-OMEGA3"],
+ analysis:"프로바이오틱스→장건강/면역. 판토비오틴→피부(비오틴+판토텐산).",
+ alerts:"나이아신 50mg→UL 35 초과. 비오틴 5000mcg→혈액검사 교란주의"},
+{id:"SC-032",title:"20대 여성 다이어트 + 탈모 + 스트레스",gender:"여성",age:25,
+ conditions:[],medications:[],
+ essential:["MC-DIET","MC-PANTO-BIOTIN","MC-ANTI-STRESS"],optional:["MC-HEM-IRON","MC-VITD"],
+ analysis:"다이어트→영양부족→탈모 악순환. 판토비오틴+HCA+테아닌 조합.",
+ alerts:"나이아신 50mg→UL 35 초과. 판토텐산 합산 205mg. 비오틴5000mcg. 철분추가시 엽산 합산 주의"}
+];
+
+function renderScenarios() {
+  filterScenarios();
+}
+
+function filterScenarios() {
+  const q = (document.getElementById('scenario-search')?.value || '').toLowerCase();
+  const filtered = q ? SCENARIOS.filter(s =>
+    s.title.toLowerCase().includes(q) ||
+    s.analysis.toLowerCase().includes(q) ||
+    (s.medications||[]).join(' ').toLowerCase().includes(q) ||
+    (s.conditions||[]).join(' ').toLowerCase().includes(q)
+  ) : SCENARIOS;
+
+  const div = document.getElementById('scenario-list');
+  div.innerHTML = filtered.map(s => {
+    const essProds = s.essential.map(id => {const p=PRODUCTS.find(x=>x.id===id); return p?p.name:id;}).join(', ');
+    const optProds = s.optional.map(id => {const p=PRODUCTS.find(x=>x.id===id); return p?p.name:id;}).join(', ');
+    const hasAlert = s.alerts.includes('초과') || s.alerts.includes('🚨');
+    return `<div class="card" style="padding:14px;${hasAlert?'border-left:3px solid var(--danger)':''}">
+      <div style="display:flex;justify-content:space-between;align-items:start;gap:12px">
+        <div style="flex:1">
+          <strong style="color:var(--primary)">${s.id}</strong> ${s.title}
+          <div style="font-size:12px;color:var(--text-secondary);margin:4px 0">${s.gender}/${s.age}세
+            ${s.medications.length?` · 💊 ${s.medications.join(', ')}`:''}
+            ${s.conditions.length?` · 🏥 ${s.conditions.join(', ')}`:''}</div>
+          <div style="font-size:13px;margin:6px 0">${s.analysis}</div>
+          <div style="font-size:12px"><strong style="color:var(--success)">필수:</strong> ${essProds}</div>
+          ${optProds?`<div style="font-size:12px"><strong style="color:var(--text-secondary)">선택:</strong> ${optProds}</div>`:''}
+          ${s.alerts?`<div style="font-size:11px;color:var(--danger);margin-top:4px">⚠️ ${s.alerts}</div>`:''}
+        </div>
+        <button class="btn btn-primary" style="white-space:nowrap;padding:8px 16px;font-size:13px" onclick='applyScenario(${JSON.stringify(s).replace(/'/g,"\\'")})'> 적용</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function applyScenario(s) {
+  // 기본정보
+  document.getElementById('gender').value = s.gender;
+  document.getElementById('gender').dispatchEvent(new Event('change'));
+  document.getElementById('age').value = s.age;
+
+  // 약물
+  state.medications = [...(s.medications||[])];
+  renderMedications();
+  analyzeDrugMuggers();
+
+  // 제품 선택
+  state.selectedProducts = [...s.essential, ...(s.optional||[])];
+  renderProducts();
+
+  // 조건
+  state.selectedConditions = [...(s.conditions||[])];
+  document.querySelectorAll('#conditions-chips .chip').forEach(c => {
+    c.classList.toggle('selected', state.selectedConditions.includes(c.dataset.value));
+  });
+
+  alert(`✅ 시나리오 "${s.title}" 적용 완료!\n\n필수 제품 ${s.essential.length}개 + 선택 제품 ${(s.optional||[]).length}개가 자동 선택되었습니다.\n\n→ 고객 정보를 확인/수정한 후\n→ "스크리닝 실행"으로 성분 체크를 진행하세요.`);
+  goTab('intake');
+}
+
 // 초기화 실행
 init();
 renderSavedList();
+renderScenarios();
 </script>
 </body>
 </html>
