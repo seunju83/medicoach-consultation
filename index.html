@@ -141,10 +141,18 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); outline
 </head>
 <body>
 
-<div class="header">
-  <h1>메디코치 약사 상담 보조 시스템</h1>
-  <p>영양제 맞춤 추천 · 성분 중복/상한량 스크리닝 · 드럭머거 분석</p>
+<div class="header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+  <div>
+    <h1>메디코치 약사 상담 보조 시스템</h1>
+    <p>영양제 맞춤 추천 · 성분 중복/상한량 스크리닝 · 드럭머거 분석</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <input type="text" id="survey-code-input" placeholder="상담코드 입력" maxlength="6" style="width:120px;padding:8px;border-radius:8px;border:none;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:2px;text-align:center">
+    <button onclick="loadSurveyByCode()" style="padding:8px 14px;border-radius:8px;border:none;background:#fbbf24;color:#1e293b;font-weight:700;cursor:pointer;font-size:13px">불러오기</button>
+    <span id="notify-badge" style="display:none;background:#dc2626;color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:700;animation:pulse 2s infinite;cursor:pointer" onclick="goTab('intake')">🔔 새 설문</span>
+  </div>
 </div>
+<style>@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}</style>
 
 <div class="tabs" id="tabs">
   <div class="tab active" data-tab="intake">1. 고객 정보</div>
@@ -1520,10 +1528,124 @@ function applyScenario(s) {
   goTab('intake');
 }
 
+// ══════════════════════════════════════════════════════════════
+// 환자 설문 수신 & 적용
+// ══════════════════════════════════════════════════════════════
+function checkForSurvey() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#survey=')) {
+    try {
+      const encoded = hash.substring(8);
+      const json = decodeURIComponent(escape(atob(encoded)));
+      const data = JSON.parse(json);
+      applySurveyData(data);
+      window.location.hash = '';
+    } catch(e) { console.error('설문 데이터 파싱 실패', e); }
+  }
+}
+
+function loadSurveyByCode() {
+  const code = document.getElementById('survey-code-input').value.trim().toUpperCase();
+  if (!code || code.length !== 6) { alert('6자리 상담 코드를 입력해 주세요.'); return; }
+  const stored = localStorage.getItem('survey_' + code);
+  if (stored) {
+    const data = JSON.parse(stored);
+    applySurveyData(data);
+    alert('✅ 상담 코드 ' + code + ' 설문 데이터를 불러왔습니다!');
+  } else {
+    alert('해당 코드의 설문을 찾을 수 없습니다.\n\n환자가 보낸 링크를 직접 클릭하시거나,\n같은 기기에서 작성된 코드만 조회 가능합니다.');
+  }
+}
+
+function applySurveyData(data) {
+  if (data.type !== 'patient_survey') return;
+
+  // 기본정보
+  if (data.patient) {
+    document.getElementById('gender').value = data.patient.gender || '여성';
+    document.getElementById('gender').dispatchEvent(new Event('change'));
+    document.getElementById('age').value = data.patient.age || '';
+    if (data.patient.height) document.getElementById('height').value = data.patient.height;
+    if (data.patient.weight) document.getElementById('weight').value = data.patient.weight;
+    calcBMI();
+    if (data.patient.pregnancy) {
+      const preg = document.getElementById('pregnancy');
+      if (preg) preg.value = data.patient.pregnancy;
+    }
+  }
+
+  // 관리분야
+  state.selectedConcerns = data.concerns || [];
+  document.querySelectorAll('#concerns-chips .chip').forEach(c => {
+    c.classList.toggle('selected', state.selectedConcerns.includes(c.dataset.value));
+  });
+
+  // 기저질환
+  state.selectedConditions = data.conditions || [];
+  document.querySelectorAll('#conditions-chips .chip').forEach(c => {
+    c.classList.toggle('selected', state.selectedConditions.includes(c.dataset.value));
+  });
+
+  // 알레르기
+  state.selectedAllergies = data.allergies || [];
+  document.querySelectorAll('#allergy-chips .chip').forEach(c => {
+    c.classList.toggle('selected', state.selectedAllergies.includes(c.dataset.value));
+  });
+
+  // 약물
+  state.medications = data.medications || [];
+  renderMedications();
+  analyzeDrugMuggers();
+
+  // 기존 건기식
+  const suppField = document.getElementById('current-supplements');
+  if (suppField && data.currentSupplements) suppField.value = data.currentSupplements;
+
+  // 혈액검사 (이름 매칭)
+  if (data.bloodTests) {
+    state.bloodTests = data.bloodTests;
+    for (const m of BLOOD_MARKERS) {
+      const el = document.getElementById('blood-' + m.id);
+      // 이름이나 약어로 매칭
+      const val = data.bloodTests[m.name] || data.bloodTests[m.id];
+      if (el && val != null) el.value = val;
+    }
+  }
+
+  // 생활습관
+  if (data.lifestyle) {
+    const map = {sleep:'sleep',exercise:'exercise',alcohol:'alcohol',smoking:'smoking',sun:'sun',stress:'stress'};
+    for (const [k,elId] of Object.entries(map)) {
+      const el = document.getElementById(elId);
+      if (el && data.lifestyle[k]) {
+        el.value = data.lifestyle[k];
+        if (k === 'stress') document.getElementById('stress-val').textContent = data.lifestyle[k];
+      }
+    }
+  }
+
+  // 메모
+  if (data.memo) {
+    const memoField = document.getElementById('intake-memo');
+    if (memoField) memoField.value = '📩 환자 사전 설문 메모:\n' + data.memo;
+  }
+
+  // 알림 표시
+  const badge = document.getElementById('notify-badge');
+  if (badge) {
+    badge.style.display = 'inline';
+    badge.textContent = '🔔 설문 수신!';
+    setTimeout(() => { badge.style.display = 'none'; }, 10000);
+  }
+
+  goTab('intake');
+}
+
 // 초기화 실행
 init();
 renderSavedList();
 renderScenarios();
+checkForSurvey();
 </script>
 </body>
 </html>

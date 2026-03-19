@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>메디코치 사전 설문</title>
+<style>
+:root{--primary:#2563eb;--primary-light:#dbeafe;--bg:#f8fafc;--card:#fff;--text:#1e293b;--text2:#64748b;--border:#e2e8f0;--radius:12px;--success:#16a34a}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
+.header{background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;padding:20px 24px;text-align:center}
+.header h1{font-size:20px}.header p{font-size:13px;opacity:.85;margin-top:4px}
+.main{max-width:640px;margin:0 auto;padding:16px}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.08);padding:20px;margin-bottom:14px;border:1px solid var(--border)}
+.card h3{font-size:15px;color:var(--primary);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.step-num{background:var(--primary);color:#fff;width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700}
+label{display:block;font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px;margin-top:10px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;transition:border .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.chip-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip{padding:8px 16px;border-radius:20px;font-size:14px;cursor:pointer;border:1.5px solid var(--border);background:#fff;transition:all .2s;user-select:none}
+.chip:hover{border-color:var(--primary)}.chip.on{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn{padding:14px 28px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;border:none;transition:all .2s;width:100%}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:#1d4ed8}
+.btn-success{background:var(--success);color:#fff}
+.progress{display:flex;gap:4px;margin-bottom:16px}
+.progress-dot{flex:1;height:4px;border-radius:2px;background:#e2e8f0}.progress-dot.active{background:var(--primary)}
+.med-item{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f1f5f9;border-radius:8px;margin-top:6px}
+.med-item button{background:none;border:none;color:#dc2626;font-size:18px;cursor:pointer}
+.med-item span{flex:1;font-size:14px}
+.result-box{background:#f0fdf4;border:2px solid var(--success);border-radius:12px;padding:24px;text-align:center;margin-top:16px}
+.result-box h2{color:var(--success);margin-bottom:12px}
+.code-display{font-size:36px;font-weight:900;letter-spacing:8px;color:var(--primary);margin:16px 0;font-family:monospace}
+.copy-btn{padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;border:2px solid var(--primary);background:#fff;color:var(--primary);font-weight:600;margin:4px}
+.copy-btn:hover{background:var(--primary-light)}
+.hidden{display:none}
+.blood-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+.blood-row label{min-width:100px;margin:0;font-size:13px}
+.blood-row input{width:90px;padding:8px;font-size:14px}
+.blood-row .unit{font-size:11px;color:var(--text2);min-width:50px}
+@media(max-width:480px){.row,.row3{grid-template-columns:1fr}.code-display{font-size:28px;letter-spacing:4px}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>메디코치 사전 설문</h1>
+  <p>약사 상담 전 미리 작성해 주세요</p>
+</div>
+
+<div class="main">
+  <div class="progress" id="progress"></div>
+
+  <!-- STEP 1: 기본 정보 -->
+  <div class="step" id="step1">
+    <div class="card">
+      <h3><span class="step-num">1</span> 기본 정보</h3>
+      <div class="row">
+        <div><label>성별</label><select id="p-gender"><option>여성</option><option>남성</option></select></div>
+        <div><label>나이</label><input type="number" id="p-age" placeholder="30"></div>
+      </div>
+      <div class="row">
+        <div><label>키 (cm)</label><input type="number" id="p-height" placeholder="165"></div>
+        <div><label>체중 (kg)</label><input type="number" id="p-weight" placeholder="60"></div>
+      </div>
+      <div id="p-female-fields" class="hidden">
+        <label>임신/수유</label>
+        <select id="p-pregnancy"><option>해당 없음</option><option>임신 준비 중</option><option>임신 중(초기)</option><option>임신 중(중기)</option><option>임신 중(후기)</option><option>수유 중</option></select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="nextStep(2)">다음 →</button>
+  </div>
+
+  <!-- STEP 2: 관리 분야 -->
+  <div class="step hidden" id="step2">
+    <div class="card">
+      <h3><span class="step-num">2</span> 어떤 부분이 신경 쓰이시나요? (최대 5개)</h3>
+      <div class="chip-wrap" id="p-concerns"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" style="background:#e2e8f0;color:var(--text)" onclick="nextStep(1)">← 이전</button>
+      <button class="btn btn-primary" onclick="nextStep(3)">다음 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: 기저질환 -->
+  <div class="step hidden" id="step3">
+    <div class="card">
+      <h3><span class="step-num">3</span> 현재 진단받은 질환이 있으신가요?</h3>
+      <div class="chip-wrap" id="p-conditions"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" style="background:#e2e8f0;color:var(--text)" onclick="nextStep(2)">← 이전</button>
+      <button class="btn btn-primary" onclick="nextStep(4)">다음 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 4: 복용 약물 -->
+  <div class="step hidden" id="step4">
+    <div class="card">
+      <h3><span class="step-num">4</span> 현재 복용 중인 약이 있으신가요?</h3>
+      <p style="font-size:13px;color:var(--text2)">처방약, 일반약 모두 입력해 주세요</p>
+      <div class="row" style="margin-top:8px">
+        <input type="text" id="p-med-input" placeholder="예: 메트포르민 500mg" list="p-med-list">
+        <button class="btn btn-primary" style="width:auto;padding:10px 20px" onclick="addPMed()">추가</button>
+      </div>
+      <datalist id="p-med-list">
+        <option>메트포르민 500mg</option><option>아토르바스타틴 10mg</option><option>로수바스타틴 10mg</option>
+        <option>오메프라졸 20mg</option><option>판토프라졸 40mg</option><option>에소메프라졸 20mg</option>
+        <option>레보티록신 100mcg</option><option>암로디핀 5mg</option><option>텔미사르탄 40mg</option>
+        <option>아스피린 100mg</option><option>와파린</option><option>에스시탈로프람 10mg</option>
+        <option>알렌드로네이트 70mg(주1회)</option><option>경구피임약</option><option>탐스로신 0.2mg</option>
+      </datalist>
+      <div id="p-med-items"></div>
+
+      <label style="margin-top:16px">현재 복용 중인 영양제/건강기능식품</label>
+      <textarea id="p-current-supps" rows="2" placeholder="예: 종합비타민 1년째 복용 중"></textarea>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" style="background:#e2e8f0;color:var(--text)" onclick="nextStep(3)">← 이전</button>
+      <button class="btn btn-primary" onclick="nextStep(5)">다음 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 5: 혈액검사 -->
+  <div class="step hidden" id="step5">
+    <div class="card">
+      <h3><span class="step-num">5</span> 최근 혈액검사 결과 (아는 항목만)</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:8px">건강검진 결과지를 보면서 입력하시면 됩니다. 모르면 빈칸으로 두세요.</p>
+      <div id="p-blood-fields"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" style="background:#e2e8f0;color:var(--text)" onclick="nextStep(4)">← 이전</button>
+      <button class="btn btn-primary" onclick="nextStep(6)">다음 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 6: 생활습관 -->
+  <div class="step hidden" id="step6">
+    <div class="card">
+      <h3><span class="step-num">6</span> 생활습관</h3>
+      <div class="row">
+        <div><label>수면 시간</label><select id="p-sleep"><option>5시간 미만</option><option>5~6시간</option><option selected>6~7시간</option><option>7~8시간</option><option>8시간 이상</option></select></div>
+        <div><label>운동 빈도</label><select id="p-exercise"><option>거의 안 함</option><option selected>주 1~2회</option><option>주 3~4회</option><option>주 5회 이상</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>음주</label><select id="p-alcohol"><option selected>전혀 안 함</option><option>월 1~2회</option><option>주 1~2회</option><option>주 3~4회</option><option>거의 매일</option></select></div>
+        <div><label>흡연</label><select id="p-smoking"><option selected>비흡연</option><option>과거 흡연</option><option>현재 흡연</option></select></div>
+      </div>
+      <div class="row">
+        <div><label>일광 노출(하루)</label><select id="p-sun"><option>거의 없음</option><option selected>30분 미만</option><option>30분~1시간</option><option>1시간 이상</option></select></div>
+        <div><label>직업 유형</label><select id="p-job"><option selected>실내 사무직</option><option>서서 하는 업무</option><option>육체노동</option><option>교대 근무</option><option>재택/자영업</option><option>학생</option></select></div>
+      </div>
+      <label>스트레스 수준</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px">낮음</span>
+        <input type="range" id="p-stress" min="1" max="10" value="5" style="flex:1">
+        <span style="font-size:12px">높음</span>
+        <strong id="p-stress-val" style="min-width:24px;text-align:center">5</strong>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" style="background:#e2e8f0;color:var(--text)" onclick="nextStep(5)">← 이전</button>
+      <button class="btn btn-primary" onclick="nextStep(7)">다음 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 7: 추가사항 + 알레르기 -->
+  <div class="step hidden" id="step7">
+    <div class="card">
+      <h3><span class="step-num">7</span> 알레르기</h3>
+      <div class="chip-wrap" id="p-allergies"></div>
+    </div>
+    <div class="card">
+      <h3>💬 약사에게 전달할 내용</h3>
+      <textarea id="p-memo" rows="4" placeholder="예: 최근 3개월간 피로감이 심해졌어요 / 6개월 후 임신을 계획하고 있어요 / 탈모가 심해지고 있어요"></textarea>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" style="background:#e2e8f0;color:var(--text)" onclick="nextStep(6)">← 이전</button>
+      <button class="btn btn-success" onclick="submitSurvey()">✅ 설문 제출</button>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="step hidden" id="step-result">
+    <div class="result-box">
+      <h2>✅ 설문이 완료되었습니다!</h2>
+      <p>아래 상담 코드를 약사에게 전달해 주세요</p>
+      <div class="code-display" id="result-code"></div>
+      <div style="margin-top:16px">
+        <button class="copy-btn" onclick="copyCode()">📋 코드 복사</button>
+        <button class="copy-btn" onclick="copyLink()">🔗 링크 복사</button>
+        <button class="copy-btn" onclick="shareKakao()">💬 카카오톡 공유</button>
+      </div>
+      <p style="font-size:12px;color:var(--text2);margin-top:16px">
+        코드 유효기간: 7일<br>
+        링크를 약사에게 보내시면 상담 시 자동으로 불러옵니다
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOTAL_STEPS = 7;
+const CONCERNS = ["기억·인지력","피로","수면·긴장완화","눈","구강·치아","피부·탈모","항노화","다이어트","콜레스테롤","혈압","혈행","혈당","갱년기","관절·연골","뼈","간","장","전립선","월경전증후군","면역력"];
+const CONDITIONS = ["없음","고혈압","당뇨병(2형)","이상지질혈증","갑상선기능저하증","갑상선기능항진증","위식도역류질환(GERD)","과민성대장증후군(IBS)","골다공증","골감소증","관절염","천식/알레르기","우울증/불안장애","빈혈","통풍","만성신장질환","지방간","전립선비대증"];
+const ALLERGIES = ["없음","조개류/갑각류","대두(콩)","유제품","글루텐","견과류","계란","약물 알레르기"];
+const BLOODS = [
+  {id:"vitD",n:"25(OH)D 비타민D",u:"ng/mL"},{id:"ferritin",n:"페리틴",u:"ng/mL"},
+  {id:"hb",n:"혈색소(Hb)",u:"g/dL"},{id:"b12",n:"비타민B12",u:"pg/mL"},
+  {id:"glucose",n:"공복혈당",u:"mg/dL"},{id:"hba1c",n:"HbA1c",u:"%"},
+  {id:"tg",n:"중성지방",u:"mg/dL"},{id:"tc",n:"총콜레스테롤",u:"mg/dL"},
+  {id:"ldl",n:"LDL",u:"mg/dL"},{id:"hdl",n:"HDL",u:"mg/dL"},
+  {id:"ast",n:"AST(GOT)",u:"U/L"},{id:"alt",n:"ALT(GPT)",u:"U/L"},
+  {id:"ggt",n:"GGT",u:"U/L"},{id:"tsh",n:"TSH",u:"mIU/L"},
+];
+
+let pMeds = [];
+let selectedConcerns = [], selectedConditions = [], selectedAllergies = [];
+
+function init() {
+  // progress
+  const prog = document.getElementById('progress');
+  for(let i=1;i<=TOTAL_STEPS;i++) prog.innerHTML += `<div class="progress-dot" id="prog-${i}"></div>`;
+  updateProgress(1);
+
+  // chips
+  makeChips('p-concerns', CONCERNS, selectedConcerns, 5);
+  makeChips('p-conditions', CONDITIONS, selectedConditions, 10);
+  makeChips('p-allergies', ALLERGIES, selectedAllergies, 5);
+
+  // blood fields
+  const bf = document.getElementById('p-blood-fields');
+  BLOODS.forEach(b => {
+    bf.innerHTML += `<div class="blood-row"><label>${b.n}</label><input type="number" step="any" id="pb-${b.id}" placeholder="-"><span class="unit">${b.u}</span></div>`;
+  });
+
+  // gender toggle
+  document.getElementById('p-gender').onchange = e => {
+    document.getElementById('p-female-fields').classList.toggle('hidden', e.target.value !== '여성');
+  };
+
+  // stress
+  document.getElementById('p-stress').oninput = e => document.getElementById('p-stress-val').textContent = e.target.value;
+}
+
+function makeChips(containerId, options, arr, max) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = options.map(o=>`<div class="chip" data-v="${o}">${o}</div>`).join('');
+  el.querySelectorAll('.chip').forEach(c => {
+    c.onclick = () => {
+      const v = c.dataset.v;
+      if(v==='없음'){arr.length=0;el.querySelectorAll('.chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');return}
+      el.querySelector('[data-v="없음"]')?.classList.remove('on');
+      const idx = arr.indexOf(v);
+      if(idx>=0){arr.splice(idx,1);c.classList.remove('on')}
+      else if(arr.length<max){arr.push(v);c.classList.add('on')}
+    };
+  });
+}
+
+function nextStep(n) {
+  document.querySelectorAll('.step').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('step'+n).classList.remove('hidden');
+  updateProgress(n);
+  window.scrollTo(0,0);
+}
+
+function updateProgress(n) {
+  for(let i=1;i<=TOTAL_STEPS;i++) document.getElementById('prog-'+i).classList.toggle('active', i<=n);
+}
+
+function addPMed() {
+  const input = document.getElementById('p-med-input');
+  const v = input.value.trim();
+  if(!v) return;
+  pMeds.push(v);
+  input.value = '';
+  renderPMeds();
+}
+
+function removePMed(i) { pMeds.splice(i,1); renderPMeds(); }
+
+function renderPMeds() {
+  document.getElementById('p-med-items').innerHTML = pMeds.map((m,i)=>
+    `<div class="med-item"><span>${m}</span><button onclick="removePMed(${i})">✕</button></div>`
+  ).join('');
+}
+
+function submitSurvey() {
+  const age = document.getElementById('p-age').value;
+  if(!age){alert('나이를 입력해 주세요.');nextStep(1);return}
+
+  // collect blood tests
+  const bloodTests = {};
+  BLOODS.forEach(b => {
+    const v = parseFloat(document.getElementById('pb-'+b.id)?.value);
+    if(v) bloodTests[b.n] = v;
+  });
+
+  const data = {
+    type: 'patient_survey',
+    version: '1.0',
+    submittedAt: new Date().toISOString(),
+    patient: {
+      gender: document.getElementById('p-gender').value,
+      age: parseInt(age),
+      height: document.getElementById('p-height').value,
+      weight: document.getElementById('p-weight').value,
+      pregnancy: document.getElementById('p-pregnancy')?.value || '해당 없음',
+    },
+    concerns: [...selectedConcerns],
+    conditions: [...selectedConditions],
+    allergies: [...selectedAllergies],
+    medications: [...pMeds],
+    currentSupplements: document.getElementById('p-current-supps').value,
+    bloodTests,
+    lifestyle: {
+      sleep: document.getElementById('p-sleep').value,
+      exercise: document.getElementById('p-exercise').value,
+      alcohol: document.getElementById('p-alcohol').value,
+      smoking: document.getElementById('p-smoking').value,
+      sun: document.getElementById('p-sun').value,
+      job: document.getElementById('p-job').value,
+      stress: document.getElementById('p-stress').value,
+    },
+    memo: document.getElementById('p-memo').value,
+  };
+
+  // Generate 6-digit code
+  const code = generateCode();
+  data.code = code;
+
+  // Store in localStorage (for same-device) + encode in URL
+  localStorage.setItem('survey_'+code, JSON.stringify(data));
+
+  // Also create shareable link with encoded data
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  const baseUrl = window.location.href.replace('patient.html','index.html');
+  const shareLink = baseUrl + '#survey=' + encoded;
+
+  // Show result
+  document.querySelectorAll('.step').forEach(s=>s.classList.add('hidden'));
+  document.getElementById('step-result').classList.remove('hidden');
+  document.getElementById('result-code').textContent = code;
+
+  // Store link for sharing
+  window._shareLink = shareLink;
+  window._code = code;
+  window._surveyData = data;
+}
+
+function generateCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for(let i=0;i<6;i++) code += chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function copyCode() {
+  navigator.clipboard?.writeText(window._code);
+  alert('상담 코드가 복사되었습니다: ' + window._code);
+}
+
+function copyLink() {
+  navigator.clipboard?.writeText(window._shareLink);
+  alert('링크가 복사되었습니다!\n약사에게 이 링크를 보내주세요.');
+}
+
+function shareKakao() {
+  const text = `[메디코치 사전설문 완료]\n상담 코드: ${window._code}\n\n약사님 상담 앱에서 이 코드를 입력하거나 아래 링크를 열어주세요:\n${window._shareLink}`;
+  if(navigator.share) {
+    navigator.share({title:'메디코치 사전설문',text}).catch(()=>{});
+  } else {
+    navigator.clipboard?.writeText(text);
+    alert('공유 내용이 복사되었습니다!\n카카오톡에 붙여넣기 해주세요.');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
