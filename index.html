@@ -537,6 +537,106 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); outline
 
 <script>
 // ══════════════════════════════════════════════════════════════
+// 메디코치 제품별 장점 및 특성
+const PRODUCT_HIGHLIGHTS = {
+  'MC-MULTI': {
+    highlight: '1정으로 13종 비타민 + 10종 미네랄을 한번에 섭취할 수 있어, 불규칙한 식사로 부족하기 쉬운 영양소를 폭넓게 보충해 드립니다.',
+    keyPoints: ['비타민·미네랄 23종을 하루 1정으로 간편하게', '식사만으로 채우기 어려운 기본 영양 베이스'],
+  },
+  'MC-PANTO-BIOTIN': {
+    highlight: '비오틴 5,000mcg과 판토텐산 200mg을 고함량으로 담아, 모발과 피부 건강이 신경 쓰이시는 분께 적합합니다. B군 비타민도 함께 들어 있어 에너지 생성에도 도움을 줍니다.',
+    keyPoints: ['비오틴 5,000mcg 고함량 (모발·피부 영양 공급)', '판토텐산 200mg + B군 비타민 복합 구성'],
+  },
+  'MC-HEM-IRON': {
+    highlight: '헴철과 비헴철을 함께 배합하여 흡수율을 높였으며, 비타민C 100mg이 함께 들어 있어 철분 흡수를 돕습니다. 엽산과 B12도 포함되어 있어 혈액 건강에 종합적으로 도움을 줍니다.',
+    keyPoints: ['헴철+비헴철 이중 배합으로 흡수율 고려', '비타민C·엽산·B12 함께 구성'],
+  },
+  'MC-OMEGA3': {
+    highlight: 'rTG(re-esterified Triglyceride) 형태의 오메가3로, 일반 오메가3보다 체내 흡수율이 높습니다. EPA+DHA 합계 600mg이 들어 있습니다.',
+    keyPoints: ['rTG 형태로 흡수율 우수', 'EPA+DHA 600mg 함유'],
+  },
+  'MC-VITD': {
+    highlight: '1정에 비타민D 2,000IU(50mcg)를 함유하고 있어, 하루 한 알로 충분한 양을 간편하게 보충하실 수 있습니다.',
+    keyPoints: ['2,000IU 적정 용량', '하루 1정으로 간편'],
+  },
+  'MC-VITC': {
+    highlight: '비타민C 500mg으로 항산화 작용과 철분 흡수를 도울 수 있습니다. 결합조직 형성과 면역 기능 유지에 도움을 줍니다.',
+    keyPoints: ['비타민C 500mg 함유', '항산화 + 철 흡수 촉진 도움'],
+  },
+  'MC-PROBIOTICS': {
+    highlight: '유산균 300억 CFU가 들어 있어, 장 내 유익균을 늘리고 배변활동을 원활하게 하는 데 도움을 줄 수 있습니다.',
+    keyPoints: ['300억 CFU 고함량', '장 건강 + 면역력 도움'],
+  },
+  'MC-LUTEIN': {
+    highlight: '루테인 18.18mg + 지아잔틴 + 아스타잔틴이 함께 구성되어 있어, 디지털 기기 사용이 많거나 눈 건강이 신경 쓰이시는 분께 좋습니다.',
+    keyPoints: ['루테인 18mg + 지아잔틴 + 아스타잔틴 복합', '아연·셀렌도 함께 구성'],
+  },
+  'MC-COQ10': {
+    highlight: 'CoQ10 100mg을 함유하여 세포 에너지 생성을 돕고, 항산화 작용을 합니다. 특히 스타틴 계열 약물을 드시는 분께 보충이 도움이 됩니다.',
+    keyPoints: ['CoQ10 100mg 함유', '항산화 + 에너지 대사 도움'],
+  },
+  'MC-MILKTHISTLE': {
+    highlight: '실리마린 130mg이 들어 있어 간 건강에 도움을 줄 수 있으며, B군 비타민도 함께 들어 있어 피로감이 있으신 분께 적합합니다.',
+    keyPoints: ['실리마린 130mg (간 건강 도움)', 'B군 비타민 복합 구성'],
+  },
+  'MC-MAG400': {
+    highlight: '마그네슘 400mg을 하루 1정으로 섭취할 수 있습니다. 신경과 근육 기능 유지, 에너지 이용에 필요한 영양소입니다. 취침 전 복용하시면 좋습니다.',
+    keyPoints: ['마그네슘 400mg 고함량', '취침 전 복용으로 편안한 컨디션 도움'],
+  },
+  'MC-BONE': {
+    highlight: '칼슘 300mg + 마그네슘 150mg + 비타민D + 아연이 골 건강에 필요한 영양소를 한번에 담았습니다. 폴리감마글루탐산도 포함되어 칼슘 흡수를 돕습니다.',
+    keyPoints: ['칼슘+마그네슘+비타민D 복합', '폴리감마글루탐산 → 칼슘 흡수 도움'],
+  },
+  'MC-CURCUMIN': {
+    highlight: '커큐민이 들어 있어 혈행 개선에 도움을 줄 수 있는 제품입니다.',
+    keyPoints: ['커큐민 함유', '혈행 건강 도움'],
+  },
+  'MC-SAW-PALMETTO': {
+    highlight: '쏘팔메토와 옥타코사놀을 함께 담아 전립선 건강 유지에 도움을 줄 수 있으며, 아연 25mg이 들어 있어 면역기능과 세포분열에도 도움을 줍니다.',
+    keyPoints: ['쏘팔메토 + 옥타코사놀 복합', '아연 25mg 함유'],
+  },
+  'MC-ANTI-AGING': {
+    highlight: '소포리코사이드와 셀렌, 비타민D가 함께 구성되어 있어 갱년기 건강 관리와 항산화에 도움을 줄 수 있습니다.',
+    keyPoints: ['갱년기 건강 도움', '셀렌 + 비타민D 포함'],
+  },
+  'MC-GINKGO': {
+    highlight: '은행잎 추출물(플라보놀배당체 36mg)이 기억력 개선과 혈행 개선에 도움을 줄 수 있습니다.',
+    keyPoints: ['은행잎추출물 고함량', '기억력 + 혈행 개선 도움'],
+  },
+  'MC-DENTAL': {
+    highlight: '칼슘과 비타민C, 아연, 총 플라보노이드가 함께 들어 있어 치아와 구강 건강 관리에 적합한 제품입니다.',
+    keyPoints: ['구강 건강 특화 구성', '칼슘 + 비타민C + 아연'],
+  },
+  'MC-RED-GINSENG': {
+    highlight: '진세노사이드와 함께 아연, 판토텐산, 비타민B6가 들어 있어 활력이 필요하신 분께 적합합니다.',
+    keyPoints: ['홍삼(진세노사이드) 함유', '아연 + B군 비타민 구성'],
+  },
+  'MC-MEMORY-PS': {
+    highlight: '포스파티딜세린 300mg + 은행잎추출물이 함께 들어 있어 인지력 개선에 도움을 줄 수 있습니다.',
+    keyPoints: ['PS 300mg + 은행잎 복합', '인지력 개선 도움'],
+  },
+  'MC-BLOOD-SUGAR': {
+    highlight: '바나바잎(코로솔산)과 크롬이 함께 들어 있어 식후 혈당 상승 억제에 도움을 줄 수 있으며, B군 비타민과 셀렌, 아연도 포함되어 있습니다.',
+    keyPoints: ['코로솔산 + 크롬 복합', 'B군 비타민 + 셀렌 + 아연 포함'],
+  },
+  'MC-PMS': {
+    highlight: '감마리놀렌산(GLA) 240mg + 비타민E가 들어 있어 월경 전 불편함이 있으신 분께 도움을 줄 수 있습니다.',
+    keyPoints: ['GLA 240mg 함유', '비타민E 함께 구성'],
+  },
+  'MC-JOINT-MSM': {
+    highlight: 'MSM 1,500mg + 비타민D 25mcg(1,000IU)가 함께 들어 있어 관절·연골 건강과 뼈 건강에 동시에 도움을 줍니다.',
+    keyPoints: ['MSM 1,500mg 고함량', '비타민D 1,000IU 포함'],
+  },
+  'MC-ANTI-STRESS': {
+    highlight: 'L-테아닌 250mg + 마그네슘 + 홍경천(로사빈)이 함께 들어 있어 스트레스로 인한 긴장완화와 피로 개선에 도움을 줄 수 있습니다.',
+    keyPoints: ['L-테아닌 250mg + 홍경천 복합', '마그네슘도 함께 구성'],
+  },
+  'MC-DIET': {
+    highlight: '가르시니아(HCA) 750mg + 판토텐산 + 비타민B2가 들어 있어 탄수화물이 지방으로 합성되는 것을 억제하는 데 도움을 줄 수 있습니다.',
+    keyPoints: ['HCA 750mg 함유', '에너지 대사 관련 B군 비타민 포함'],
+  },
+};
+
 // 메디코치 제품 데이터 (실제 제품 카탈로그)
 // ══════════════════════════════════════════════════════════════
 const PRODUCTS = [
@@ -2723,17 +2823,28 @@ async function generateAIDraft() {
         productHtml += `<span style="font-size:11px;color:#6366f1">식약처 인정: ${uniqueClaims.join(' / ')}</span><br>`;
       }
       productHtml += `<span style="font-size:13px;color:var(--primary)">상담 근거: ${reasons.join(' / ')}</span>`;
+      // 제품 장점
+      const ph = PRODUCT_HIGHLIGHTS[rec.id];
+      if (ph) {
+        productHtml += `<div style="margin-top:6px;padding:8px 10px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#166534;line-height:1.7">`;
+        productHtml += `${ph.highlight}`;
+        productHtml += `</div>`;
+      }
       productHtml += `</div>`;
     }
   }
   if (recommendedProducts.optional.length) {
-    productHtml += `<h4 style="color:var(--text-secondary);margin:12px 0 8px">💡 선택 추천 (${recommendedProducts.optional.length}개)</h4>`;
+    productHtml += `<h4 style="color:var(--text-secondary);margin:12px 0 8px">💡 추가 고려 제품 (${recommendedProducts.optional.length}개)</h4>`;
     for (const rec of recommendedProducts.optional.slice(0, 5)) {
       const p = PRODUCTS.find(x => x.id === rec.id);
       if (!p) continue;
+      const ph = PRODUCT_HIGHLIGHTS[rec.id];
       productHtml += `<div class="card" style="padding:12px;margin-bottom:8px;border-left:3px solid var(--border)">`;
       productHtml += `<strong>${p.name}</strong> <span style="color:var(--text-secondary);font-size:12px">(1일 ${p.dose})</span><br>`;
       productHtml += `<span style="font-size:13px">${rec.reason}</span>`;
+      if (ph) {
+        productHtml += `<div style="margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.6">${ph.highlight}</div>`;
+      }
       productHtml += `</div>`;
     }
   }
@@ -2919,13 +3030,15 @@ async function generateAIDraft() {
     for (const rec of recommendedProducts.essential) {
       const p = PRODUCTS.find(x => x.id === rec.id);
       if (!p) continue;
-      const claims = p.ing.map(i => MFDS_CLAIMS[i.n]?.claim).filter(c => c);
-      const topClaim = claims.length ? [...new Set(claims)][0] : '';
-      fullDraft += `  ✔ ${p.name}\n`;
-      fullDraft += `    1일 ${p.dose}\n`;
-      fullDraft += `    ${rec.reason}\n`;
-      if (topClaim) fullDraft += `    (${topClaim})\n`;
-      fullDraft += `\n`;
+      const ph = PRODUCT_HIGHLIGHTS[rec.id];
+      fullDraft += `  ✔ ${p.name} (1일 ${p.dose})\n\n`;
+      fullDraft += `    ${rec.reason}\n\n`;
+      if (ph) {
+        fullDraft += `    ${ph.highlight}\n\n`;
+        for (const kp of ph.keyPoints) fullDraft += `      · ${kp}\n`;
+        fullDraft += `\n`;
+      }
+      fullDraft += `  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─\n\n`;
     }
   }
   if (recommendedProducts.optional.length) {
@@ -2933,13 +3046,13 @@ async function generateAIDraft() {
     for (const rec of recommendedProducts.optional.slice(0, 5)) {
       const p = PRODUCTS.find(x => x.id === rec.id);
       if (!p) continue;
-      const claims = p.ing.map(i => MFDS_CLAIMS[i.n]?.claim).filter(c => c);
-      const topClaim = claims.length ? [...new Set(claims)][0] : '';
-      fullDraft += `  ✔ ${p.name}\n`;
-      fullDraft += `    1일 ${p.dose}\n`;
-      fullDraft += `    ${rec.reason}\n`;
-      if (topClaim) fullDraft += `    (${topClaim})\n`;
-      fullDraft += `\n`;
+      const ph = PRODUCT_HIGHLIGHTS[rec.id];
+      fullDraft += `  ✔ ${p.name} (1일 ${p.dose})\n\n`;
+      fullDraft += `    ${rec.reason}\n\n`;
+      if (ph) {
+        fullDraft += `    ${ph.highlight}\n\n`;
+      }
+      fullDraft += `  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─\n\n`;
     }
   }
 
