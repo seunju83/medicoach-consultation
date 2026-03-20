@@ -4,6 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>메디코치 약사 상담 보조 시스템</title>
+<!-- Tesseract.js OCR -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyAykU8ckc2tmBmgdYBKuLtEuDvG9qTjAns",
+  authDomain: "medicoach-consult-app.firebaseapp.com",
+  databaseURL: "https://medicoach-consult-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "medicoach-consult-app",
+  storageBucket: "medicoach-consult-app.firebasestorage.app",
+  messagingSenderId: "1202994474",
+  appId: "1:1202994474:web:5b0f5d3f70a0a2db243253"
+});
+const db = firebase.database();
+let cloudReady = false;
+db.ref('.info/connected').on('value', snap => { cloudReady = snap.val() === true; });
+</script>
 <style>
 :root {
   --primary: #2563eb;
@@ -161,7 +180,8 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); outline
   <div class="tab" data-tab="products">4. 제품 선택</div>
   <div class="tab" data-tab="screening">5. 스크리닝</div>
   <div class="tab" data-tab="report">6. 상담 보고서</div>
-  <div class="tab" data-tab="scenarios" style="margin-left:auto;color:#16a34a">📖 시나리오</div>
+  <div class="tab" data-tab="aidraft" style="margin-left:auto;color:#d97706;font-weight:700">AI 상담 초안</div>
+  <div class="tab" data-tab="scenarios" style="color:#16a34a">📖 시나리오</div>
   <div class="tab" data-tab="saved" style="color:#6366f1">📂 저장 목록</div>
 </div>
 
@@ -386,6 +406,102 @@ input:focus, select:focus, textarea:focus { border-color:var(--primary); outline
     <button class="btn btn-primary" style="background:#16a34a" onclick="saveConsultation()">💾 상담 저장</button>
     <button class="btn btn-primary" style="background:#6366f1" onclick="exportConsultation()">📤 파일 내보내기</button>
     <button class="btn btn-outline" onclick="goTab('intake')">새 상담 시작</button>
+  </div>
+</div>
+
+<!-- ===================== AI 상담 초안 ===================== -->
+<div class="section" id="sec-aidraft">
+  <div class="card" style="border-left:4px solid #d97706">
+    <h3 style="color:#d97706">AI 상담 초안 생성기</h3>
+    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:12px">
+      메디코치 어드민 화면을 <strong>스크린샷(이미지) 업로드</strong>하거나 <strong>텍스트 복사-붙여넣기</strong> 하세요.<br>
+      자동 분석하여 <strong>고객 상태 리뷰 + 영양소 추천 근거 + 제품 조합 + 주의사항</strong>을 생성합니다.
+    </p>
+
+    <!-- 이미지 업로드 영역 -->
+    <div class="form-group">
+      <label>방법 1: 어드민 화면 캡처 이미지 업로드 (여러 장 가능)</label>
+      <div id="ai-image-drop" style="border:2px dashed #d97706;border-radius:12px;padding:24px;text-align:center;cursor:pointer;background:#fffbeb;transition:all 0.2s"
+        onclick="document.getElementById('ai-image-files').click()"
+        ondragover="event.preventDefault();this.style.borderColor='#2563eb';this.style.background='#dbeafe'"
+        ondragleave="this.style.borderColor='#d97706';this.style.background='#fffbeb'"
+        ondrop="handleImageDrop(event)">
+        <div style="font-size:32px;margin-bottom:8px">📸</div>
+        <div style="font-size:14px;font-weight:600;color:#d97706">클릭하여 이미지 선택 또는 여기에 드래그&드롭</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Ctrl+V 로 클립보드에서 직접 붙여넣기도 가능합니다</div>
+        <input type="file" id="ai-image-files" accept="image/*" multiple style="display:none" onchange="handleImageUpload(event)">
+      </div>
+      <div id="ai-image-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+      <div id="ai-ocr-status" style="display:none;padding:10px;margin-top:8px;border-radius:8px;background:#fef3c7;font-size:13px"></div>
+    </div>
+
+    <div style="text-align:center;color:var(--text-secondary);font-size:13px;margin:8px 0">── 또는 ──</div>
+
+    <!-- 텍스트 입력 영역 -->
+    <div class="form-group">
+      <label>방법 2: 어드민 화면 텍스트 복사-붙여넣기</label>
+      <textarea id="ai-admin-input" rows="10" placeholder="어드민 화면에서 Ctrl+A(전체 선택) → Ctrl+C(복사) 후 여기에 붙여넣기
+
+자동으로 파싱되는 항목:
+• 상담 상세: 이름, 나이, 성별
+• 설문: 정기검진 사항, 관리 분야, 섭취중 영양제
+• 건강검진 이력: 신장, 체중, BMI, 혈압, 혈색소, 혈당, AST/ALT, 콜레스테롤 등
+• 문진결과: 질환력, 흡연, 신체활동, 음주
+• 장기 복용약 / 복약 이력: 약품명, 처방기관
+• 유전자 검사 결과
+
+※ 어드민 형식이 아닌 자유 형식도 인식됩니다."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>추가 참고사항 (약사가 직접 입력)</label>
+      <textarea id="ai-extra-notes" rows="3" placeholder="예: 환자가 전화 상담 시 탈모 고민 언급 / 예산 월 5만원 이내 / 수면 질 저하 호소"></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>약사 이름</label>
+        <input type="text" id="ai-pharmacist-name" placeholder="송은주" value="송은주">
+      </div>
+      <div class="form-group">
+        <label>약국명</label>
+        <input type="text" id="ai-pharmacy-name" placeholder="아이맘약국" value="아이맘약국">
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-primary" style="background:#d97706" onclick="generateAIDraft()">AI 상담 초안 생성</button>
+      <button class="btn btn-outline" style="border-color:#d97706;color:#d97706" onclick="applyAIDraftToConsult()">→ 상담 폼에 적용</button>
+    </div>
+  </div>
+
+  <div id="ai-draft-result" style="display:none">
+    <div class="card" style="border-left:4px solid var(--primary)">
+      <h3>1. 고객 상태 종합 리뷰</h3>
+      <div id="ai-review"></div>
+    </div>
+    <div class="card" style="border-left:4px solid var(--success)">
+      <h3 style="color:var(--success)">2. 영양소 추천 근거</h3>
+      <div id="ai-nutrient-rationale"></div>
+    </div>
+    <div class="card" style="border-left:4px solid var(--primary)">
+      <h3>3. 메디코치 제품 추천 조합</h3>
+      <div id="ai-product-rec"></div>
+    </div>
+    <div class="card" style="border-left:4px solid var(--danger)">
+      <h3 style="color:var(--danger)">4. 스크리닝 & 주의사항</h3>
+      <div id="ai-screening-alerts"></div>
+    </div>
+    <div class="card" style="border-left:4px solid var(--info)">
+      <h3 style="color:var(--info)">5. 복용 가이드 & 팔로업</h3>
+      <div id="ai-guide"></div>
+    </div>
+    <div class="card">
+      <h3>6. 상담 초안 전문</h3>
+      <div id="ai-full-draft" style="white-space:pre-wrap;font-size:13px;line-height:1.8;background:#f8fafc;padding:16px;border-radius:8px"></div>
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-primary" onclick="copyAIDraft()">📋 초안 복사</button>
+        <button class="btn btn-outline" onclick="applyAIDraftToConsult()">→ 상담 폼에 적용</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1638,6 +1754,1307 @@ function applySurveyData(data) {
     setTimeout(() => { badge.style.display = 'none'; }, 10000);
   }
 
+  goTab('intake');
+}
+
+// ══════════════════════════════════════════════════════════════
+// AI 상담 초안 - 이미지 OCR 처리
+// ══════════════════════════════════════════════════════════════
+
+let ocrImages = []; // 업로드된 이미지 목록
+
+function handleImageUpload(event) {
+  const files = Array.from(event.target.files);
+  processImageFiles(files);
+}
+
+function handleImageDrop(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const dt = event.dataTransfer;
+  const el = document.getElementById('ai-image-drop');
+  el.style.borderColor = '#d97706';
+  el.style.background = '#fffbeb';
+  if (dt.files && dt.files.length) {
+    processImageFiles(Array.from(dt.files));
+  }
+}
+
+// Ctrl+V 클립보드 이미지 붙여넣기
+document.addEventListener('paste', function(e) {
+  // AI 초안 탭이 활성 상태일 때만
+  if (!document.getElementById('sec-aidraft').classList.contains('active')) return;
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  const imageFiles = [];
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (file) imageFiles.push(file);
+    }
+  }
+  if (imageFiles.length) {
+    e.preventDefault();
+    processImageFiles(imageFiles);
+  }
+});
+
+function processImageFiles(files) {
+  const preview = document.getElementById('ai-image-preview');
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    const idx = ocrImages.length;
+    ocrImages.push({file, text: '', status: 'pending'});
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.innerHTML += `<div id="ocr-thumb-${idx}" style="position:relative;width:120px;height:90px;border-radius:8px;overflow:hidden;border:2px solid var(--border)">
+        <img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">
+        <div id="ocr-badge-${idx}" style="position:absolute;bottom:0;left:0;right:0;background:rgba(217,119,6,0.9);color:#fff;font-size:10px;text-align:center;padding:2px">OCR 대기중...</div>
+        <button onclick="removeOcrImage(${idx})" style="position:absolute;top:2px;right:2px;background:#dc2626;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:20px">✕</button>
+      </div>`;
+    };
+    reader.readAsDataURL(file);
+  }
+  updateOcrStatus();
+}
+
+function removeOcrImage(idx) {
+  ocrImages[idx] = null;
+  const thumb = document.getElementById('ocr-thumb-' + idx);
+  if (thumb) thumb.remove();
+  updateOcrStatus();
+}
+
+function updateOcrStatus() {
+  const active = ocrImages.filter(x => x);
+  const statusEl = document.getElementById('ai-ocr-status');
+  if (active.length) {
+    statusEl.style.display = '';
+    statusEl.textContent = `${active.length}장의 이미지가 준비되었습니다. "AI 상담 초안 생성"을 누르면 OCR 인식 후 분석을 시작합니다.`;
+  } else {
+    statusEl.style.display = 'none';
+  }
+}
+
+async function runOCROnImages() {
+  const active = ocrImages.filter(x => x && x.status === 'pending');
+  if (!active.length) return;
+
+  const statusEl = document.getElementById('ai-ocr-status');
+  statusEl.style.display = '';
+  statusEl.innerHTML = '<strong>OCR 인식 중...</strong> 이미지를 분석하고 있습니다. 잠시만 기다려 주세요.';
+
+  let allText = '';
+  for (let i = 0; i < ocrImages.length; i++) {
+    const img = ocrImages[i];
+    if (!img || img.status !== 'pending') continue;
+
+    const badge = document.getElementById('ocr-badge-' + i);
+    if (badge) { badge.textContent = 'OCR 처리중...'; badge.style.background = 'rgba(37,99,235,0.9)'; }
+
+    statusEl.innerHTML = `<strong>OCR 인식 중... (${i + 1}/${ocrImages.filter(x=>x).length})</strong> 한국어 텍스트를 추출하고 있습니다.`;
+
+    try {
+      const result = await Tesseract.recognize(img.file, 'kor+eng', {
+        logger: m => {
+          if (m.status === 'recognizing text' && badge) {
+            badge.textContent = Math.round((m.progress || 0) * 100) + '%';
+          }
+        }
+      });
+      img.text = result.data.text;
+      img.status = 'done';
+      if (badge) { badge.textContent = '완료'; badge.style.background = 'rgba(22,163,74,0.9)'; }
+      allText += '\n--- 이미지 ' + (i + 1) + ' ---\n' + result.data.text + '\n';
+    } catch (err) {
+      img.status = 'error';
+      if (badge) { badge.textContent = '오류'; badge.style.background = 'rgba(220,38,38,0.9)'; }
+      console.error('OCR error:', err);
+    }
+  }
+
+  // OCR 결과를 텍스트 영역에 추가
+  if (allText.trim()) {
+    const ta = document.getElementById('ai-admin-input');
+    const existing = ta.value.trim();
+    ta.value = (existing ? existing + '\n\n' : '') + '[OCR 인식 결과]\n' + allText.trim();
+    statusEl.innerHTML = '<strong style="color:#16a34a">OCR 완료!</strong> 인식된 텍스트가 입력란에 추가되었습니다. 내용을 확인한 후 초안을 생성하세요.';
+  }
+
+  return allText;
+}
+
+// ══════════════════════════════════════════════════════════════
+// AI 상담 초안 생성
+// ══════════════════════════════════════════════════════════════
+
+// 식약처 인정 기능성 원료 데이터
+// ※ 기능성 내용은 식품의약품안전처 고시 기준이며, 의약품이 아닌 건강기능식품 범위 내 표현입니다.
+const MFDS_CLAIMS = {
+  '비타민A': {claim:'어두운 곳에서 시각 적응을 위해 필요, 피부와 점막을 형성하고 기능을 유지하는 데 필요, 상피세포의 성장과 발달에 필요',daily:'210~1000mcg RAE'},
+  '비타민B1': {claim:'탄수화물과 에너지 대사에 필요',daily:'0.36~100mg'},
+  '비타민B2': {claim:'체내 에너지 생성에 필요',daily:'0.42~40mg'},
+  '나이아신': {claim:'체내 에너지 생성에 필요',daily:'4.5~35mg NE'},
+  '판토텐산': {claim:'지방, 탄수화물, 단백질 대사와 에너지 생성에 필요',daily:'1.5~200mg'},
+  '비타민B6': {claim:'단백질 및 아미노산 이용에 필요, 혈액의 호모시스테인 수준을 정상으로 유지하는 데 필요',daily:'0.45~100mg'},
+  '엽산': {claim:'세포와 혈액생성에 필요, 태아 신경관의 정상 발달에 필요, 혈액의 호모시스테인 수준을 정상으로 유지하는 데 필요',daily:'120~400mcg'},
+  '비타민B12': {claim:'정상적인 엽산 대사에 필요',daily:'0.72~2000mcg'},
+  '비오틴': {claim:'지방, 탄수화물, 단백질 대사와 에너지 생성에 필요',daily:'9~3000mcg'},
+  '비타민C': {claim:'결합조직 형성과 기능유지에 필요, 철의 흡수에 필요, 항산화 작용을 하여 유해산소로부터 세포를 보호하는 데 필요',daily:'30~2000mg'},
+  '비타민D': {claim:'칼슘과 인이 흡수되고 이용되는 데 필요, 뼈의 형성과 유지에 필요, 골다공증발생 위험 감소에 도움을 줌',daily:'3~100mcg (120~4000IU)'},
+  '비타민E': {claim:'항산화 작용을 하여 유해산소로부터 세포를 보호하는 데 필요',daily:'3.3~540mg α-TE'},
+  '비타민K': {claim:'정상적인 혈액응고에 필요, 뼈의 구성에 필요',daily:'21~1000mcg'},
+  '칼슘': {claim:'뼈와 치아 형성에 필요, 신경과 근육 기능 유지에 필요, 골다공증발생 위험 감소에 도움을 줌',daily:'240~2500mg'},
+  '마그네슘': {claim:'에너지 이용에 필요, 신경과 근육 기능 유지에 필요',daily:'105~350mg'},
+  '철': {claim:'체내 산소운반과 혈액생성에 필요, 에너지 생성에 필요',daily:'3.6~45mg'},
+  '아연': {claim:'정상적인 면역기능에 필요, 정상적인 세포분열에 필요',daily:'2.55~35mg'},
+  '셀렌': {claim:'유해산소로부터 세포를 보호하는 데 필요',daily:'16.5~400mcg'},
+  '구리': {claim:'철의 운반과 이용에 필요',daily:'0.24~10mg'},
+  '크롬': {claim:'체내 탄수화물, 지방, 단백질 대사에 관여',daily:'9~1000mcg'},
+  'EPA+DHA': {claim:'혈중 중성지질 개선, 혈행 개선에 도움을 줄 수 있음',daily:'500~2000mg'},
+  '코엔자임Q10': {claim:'항산화 작용을 하여 유해산소로부터 세포를 보호하는 데 필요, 높은 혈압 감소에 도움을 줄 수 있음',daily:'90~100mg'},
+  '프로바이오틱스': {claim:'유익균 증식 및 유해균 억제, 배변활동 원활에 도움을 줄 수 있음',daily:'1억~100억 CFU'},
+  '루테인': {claim:'노화로 인해 감소될 수 있는 황반색소밀도를 유지하여 눈 건강에 도움을 줄 수 있음',daily:'10~20mg'},
+  '실리마린': {claim:'간 건강에 도움을 줄 수 있음',daily:'130mg'},
+  'MSM': {claim:'관절 및 연골 건강에 도움을 줄 수 있음',daily:'1500~2000mg'},
+  '쏘팔메토': {claim:'전립선 건강의 유지에 도움을 줄 수 있음',daily:'320mg (로르산 기준 85~95%)'},
+  '감마리놀렌산': {claim:'혈중 콜레스테롤 개선, 혈행 개선에 도움을 줄 수 있음',daily:'240mg'},
+  'L-테아닌': {claim:'스트레스로 인한 긴장완화에 도움을 줄 수 있음',daily:'200~250mg'},
+  '홍경천(로사빈)': {claim:'스트레스로 인한 피로 개선에 도움을 줄 수 있음',daily:'로사빈 6.8~13.6mg'},
+  '코로솔산': {claim:'식후 혈당 상승 억제에 도움을 줄 수 있음',daily:'0.45~1.3mg'},
+  '포스파티딜세린': {claim:'인지력 개선에 도움을 줄 수 있음 (DHA 함유 경우 뇌 영양공급)',daily:'300mg'},
+  '은행잎추출물': {claim:'기억력 개선, 혈행 개선에 도움을 줄 수 있음',daily:'플라보놀배당체 28.8mg'},
+  '가르시니아(HCA)': {claim:'탄수화물이 지방으로 합성되는 것을 억제하여 체지방 감소에 도움을 줄 수 있음',daily:'750~2800mg'},
+};
+
+// 나이대별 영양소 가이드 (식약처 기능성 인정 기준 내)
+const AGE_NUTRIENT_GUIDE = {
+  '20대': {
+    female: {
+      base: ['엽산 - 세포와 혈액생성에 필요 (가임기 여성 충분한 섭취 권장)', '철 - 체내 산소운반과 혈액생성에 필요', '비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요'],
+      lifestyle: {diet:'식사량 감소 시 B군+철분+아연 섭취 부족 가능', stress:'스트레스 시 L-테아닌(긴장완화 도움)+마그네슘', skin:'비오틴(지방·단백질 대사와 에너지 생성에 필요)+판토텐산+아연'}
+    },
+    male: {
+      base: ['비타민D - 뼈의 형성과 유지에 필요', '마그네슘 - 에너지 이용에 필요'],
+      lifestyle: {exercise:'활동량 많을 시 마그네슘+아연+비타민D', eye:'루테인 - 노화로 감소될 수 있는 황반색소밀도 유지에 도움'}
+    }
+  },
+  '30대': {
+    female: {
+      base: ['엽산 - 세포와 혈액생성에 필요, 태아 신경관의 정상 발달에 필요', '철 - 체내 산소운반과 혈액생성에 필요', '비타민D - 뼈의 형성과 유지에 필요', 'EPA+DHA - 혈행 개선에 도움을 줄 수 있음'],
+      lifestyle: {pregnancy:'임신 준비: 엽산(태아 신경관 정상 발달에 필요)+비타민D+철분 중요', fatigue:'B군(체내 에너지 생성에 필요)+철분+비타민D 확인 권장', hair:'비오틴+아연(정상적 세포분열에 필요)+철분 상태 확인'}
+    },
+    male: {
+      base: ['비타민D - 뼈의 형성과 유지에 필요', 'EPA+DHA - 혈행 개선에 도움', '마그네슘 - 에너지 이용에 필요'],
+      lifestyle: {exercise:'활동량 많으면 마그네슘+비타민D+아연', liver:'간 건강 관심 시 실리마린(간 건강 도움)+B군'}
+    }
+  },
+  '40대': {
+    female: {
+      base: ['비타민D - 골다공증발생 위험 감소에 도움', 'EPA+DHA - 혈중 중성지질 개선 도움', '칼슘 - 뼈와 치아 형성에 필요', '프로바이오틱스 - 장 건강 도움'],
+      lifestyle: {menopause:'비타민D+칼슘(뼈 건강)+마그네슘+감마리놀렌산', pms:'감마리놀렌산+마그네슘(신경·근육 기능 유지)+비타민B6', metabolic:'EPA+DHA(혈중 중성지질 개선)+크롬(탄수화물 대사 관여)+코로솔산(식후 혈당 상승 억제 도움)'}
+    },
+    male: {
+      base: ['비타민D - 뼈의 형성과 유지에 필요', 'EPA+DHA - 혈중 중성지질 개선 도움', 'CoQ10 - 항산화 작용, 높은 혈압 감소에 도움을 줄 수 있음'],
+      lifestyle: {cardio:'EPA+DHA+CoQ10 우선', stress:'L-테아닌(스트레스로 인한 긴장완화 도움)+마그네슘+홍경천(스트레스 피로 개선 도움)', liver:'실리마린(간 건강 도움)+EPA+DHA'}
+    }
+  },
+  '50대': {
+    female: {
+      base: ['비타민D - 골다공증발생 위험 감소에 도움', '칼슘 - 뼈와 치아 형성에 필요', 'EPA+DHA - 혈행 개선 도움', 'B12 - 정상적인 엽산 대사에 필요'],
+      lifestyle: {menopause:'비타민D+칼슘+마그네슘 (뼈 건강 유지)', depression:'엽산(세포와 혈액생성에 필요)+B12 충분한 섭취 권장', joint:'MSM(관절 및 연골 건강 도움)+비타민D+EPA+DHA'}
+    },
+    male: {
+      base: ['비타민D - 뼈의 형성과 유지에 필요', 'EPA+DHA - 혈중 중성지질 개선 도움', 'CoQ10 - 항산화 작용', 'B12 - 정상적인 엽산 대사에 필요'],
+      lifestyle: {prostate:'쏘팔메토(전립선 건강 유지 도움)+아연(정상적 면역기능에 필요)+셀렌', cardio:'다약제 시 영양소 상호작용 체크 필수', metabolic:'크롬(탄수화물 대사 관여)+코로솔산(식후 혈당 상승 억제 도움)+EPA+DHA'}
+    }
+  },
+  '60대이상': {
+    female: {
+      base: ['비타민D - 골다공증발생 위험 감소에 도움', '칼슘 - 뼈와 치아 형성에 필요', 'B12 - 정상적인 엽산 대사에 필요', 'EPA+DHA - 혈행 개선 도움'],
+      lifestyle: {bone:'비타민D+칼슘+비타민K(뼈의 구성에 필요), 적절한 활동량 유지', polypharm:'다약제 시 최소한의 보충제, 상호작용 우선 확인', cognitive:'포스파티딜세린(인지력 개선 도움)+은행잎추출물(기억력 개선 도움)+DHA'}
+    },
+    male: {
+      base: ['비타민D - 뼈의 형성과 유지에 필요', 'B12 - 정상적인 엽산 대사에 필요', 'EPA+DHA - 혈행 개선 도움', 'CoQ10 - 항산화 작용'],
+      lifestyle: {prostate:'쏘팔메토(전립선 건강 유지 도움)+아연', cognitive:'포스파티딜세린(인지력 개선 도움)+은행잎추출물(기억력 개선 도움)+DHA', polypharm:'약물 상호작용 최우선 확인, 보충제 최소화'}
+    }
+  }
+};
+
+// 상황별 영양소 추천 (식약처 인정 기능성 기준)
+const CONDITION_NUTRIENT_GUIDE = {
+  '고혈압': {nutrients:['마그네슘 - 에너지 이용에 필요, 신경과 근육 기능 유지에 필요','EPA+DHA - 혈행 개선에 도움을 줄 수 있음','CoQ10 - 높은 혈압 감소에 도움을 줄 수 있음'],avoid:'감초추출물, 고용량 카페인 함유 제품',note:'ARB/ACE 복용 시 칼륨 함유 제품 주의'},
+  '당뇨병(2형)': {nutrients:['크롬 - 체내 탄수화물, 지방, 단백질 대사에 관여','코로솔산(바나바잎) - 식후 혈당 상승 억제에 도움을 줄 수 있음','마그네슘 - 에너지 이용에 필요','EPA+DHA - 혈중 중성지질 개선에 도움','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요'],avoid:'',note:'메트포르민 복용 시 B12 상태 확인 권장'},
+  '이상지질혈증': {nutrients:['EPA+DHA - 혈중 중성지질 개선에 도움을 줄 수 있음','CoQ10 - 항산화 작용을 하여 유해산소로부터 세포를 보호하는 데 필요','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요'],avoid:'',note:'스타틴 복용 시 CoQ10 보충 고려'},
+  '골다공증': {nutrients:['비타민D - 골다공증발생 위험 감소에 도움을 줌','칼슘 - 뼈와 치아 형성에 필요, 골다공증발생 위험 감소에 도움','비타민K - 뼈의 구성에 필요','마그네슘 - 에너지 이용에 필요'],avoid:'과다 비타민A 함유 제품',note:'비스포스포네이트와 미네랄 30분 이상 간격'},
+  '골감소증': {nutrients:['비타민D - 뼈의 형성과 유지에 필요','칼슘 - 뼈와 치아 형성에 필요','마그네슘 - 에너지 이용에 필요','MSM - 관절 및 연골 건강에 도움을 줄 수 있음'],avoid:'',note:'적절한 체중부하 활동 병행 권장'},
+  '갑상선기능저하증': {nutrients:['셀렌 - 유해산소로부터 세포를 보호하는 데 필요','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요','아연 - 정상적인 면역기능에 필요'],avoid:'고용량 요오드 함유 제품',note:'레보티록신 복용 시 미네랄 4시간 이상 간격'},
+  '위식도역류질환(GERD)': {nutrients:['프로바이오틱스 - 유익균 증식 및 유해균 억제에 도움','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요'],avoid:'',note:'PPI 장기 복용 시 마그네슘/칼슘/B12/철분 상태 확인 권장'},
+  '과민성대장증후군(IBS)': {nutrients:['프로바이오틱스 - 유익균 증식, 배변활동 원활에 도움을 줄 수 있음','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요'],avoid:'과다 마그네슘 함유 제품',note:'장 건강 개선에 프로바이오틱스가 도움'},
+  '지방간': {nutrients:['실리마린(밀크씨슬) - 간 건강에 도움을 줄 수 있음','EPA+DHA - 혈중 중성지질 개선에 도움','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요'],avoid:'',note:'생활습관 개선이 가장 중요'},
+  '빈혈': {nutrients:['철 - 체내 산소운반과 혈액생성에 필요, 에너지 생성에 필요','엽산 - 세포와 혈액생성에 필요','비타민B12 - 정상적인 엽산 대사에 필요','비타민C - 철의 흡수에 필요'],avoid:'칼슘과 철분 동시 섭취(흡수 방해)',note:'빈혈 원인에 따라 적절한 영양소 선택'},
+  '통풍': {nutrients:['비타민C - 항산화 작용을 하여 유해산소로부터 세포를 보호하는 데 필요','EPA+DHA - 혈행 개선에 도움을 줄 수 있음'],avoid:'고용량 나이아신 함유 제품',note:'이뇨제 복용 시 마그네슘/아연 상태 확인'},
+  '우울증/불안장애': {nutrients:['EPA+DHA - 혈행 개선에 도움을 줄 수 있음','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요','엽산 - 세포와 혈액생성에 필요','마그네슘 - 신경과 근육 기능 유지에 필요'],avoid:'세인트존스워트 함유 건기식(SSRI와 병용 금기!)',note:'SSRI 복용 시 엽산/B12 충분한 섭취 권장'},
+  '관절염': {nutrients:['MSM - 관절 및 연골 건강에 도움을 줄 수 있음','EPA+DHA - 혈행 개선에 도움을 줄 수 있음','비타민D - 뼈의 형성과 유지에 필요'],avoid:'',note:'MTX 복용 시 엽산 보충 의사와 상의'},
+  '전립선비대증': {nutrients:['쏘팔메토 - 전립선 건강의 유지에 도움을 줄 수 있음','아연 - 정상적인 면역기능에 필요, 정상적인 세포분열에 필요','셀렌 - 유해산소로부터 세포를 보호하는 데 필요'],avoid:'',note:'아연 고용량 장기 섭취 시 구리 부족 주의'},
+  '탈모(AGA)': {nutrients:['비오틴 - 지방, 탄수화물, 단백질 대사와 에너지 생성에 필요','판토텐산 - 지방, 탄수화물, 단백질 대사와 에너지 생성에 필요','아연 - 정상적인 세포분열에 필요','철 - 체내 산소운반과 혈액생성에 필요','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요'],avoid:'고용량 비타민A 함유 제품',note:'영양 보충은 보조적 역할. 페리틴, 아연, 비타민D, 갑상선 기능 확인 권장'},
+};
+
+function parseAdminInput(text) {
+  const result = {
+    name: '', gender: '', age: null, height: null, weight: null,
+    concerns: [], conditions: [], medications: [], allergies: [],
+    bloodTests: {}, lifestyle: {}, pregnancy: '해당 없음',
+    memo: '', currentSupplements: '', rawText: text,
+    checkupDate: '', familyHistory: [], geneticTests: [],
+    waist: null, bmi: null, bp: '', creatinine: null
+  };
+
+  if (!text || !text.trim()) return result;
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+
+  // ── 메디코치 어드민 형식 전용 파싱 ──
+
+  // 섹션 감지용
+  let currentSection = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // 섹션 헤더 감지
+    if (/상담\s*상세|상담\s*관리/.test(line)) { currentSection = 'consult'; continue; }
+    if (/건강검진\s*이력|검진\s*이력/.test(line)) { currentSection = 'checkup'; continue; }
+    if (/문진\s*결과|문진결과/.test(line)) { currentSection = 'interview'; continue; }
+    if (/장기\s*복용약/.test(line)) { currentSection = 'longterm_med'; continue; }
+    if (/복용중인\s*일반\s*의약품/.test(line)) { currentSection = 'otc_med'; continue; }
+    if (/복약\s*이력/.test(line)) { currentSection = 'prescription'; continue; }
+    if (/유전자\s*검사/.test(line)) { currentSection = 'genetic'; continue; }
+    if (/향후\s*관리를?\s*원하는\s*분야/.test(line)) { currentSection = 'mgmt_area'; continue; }
+    if (/섭취중인\s*영양제|섭취\s*중인\s*영양제/.test(line)) { currentSection = 'current_supp'; continue; }
+    if (/정기검진\s*사항/.test(line)) { currentSection = 'periodic_checkup'; continue; }
+
+    // ── 상담 상세 ──
+    // 이름
+    if (/이름\s*[:：]?\s*/.test(line) || (currentSection === 'consult' && i < 5 && !result.name)) {
+      const nameMatch = line.match(/이름\s*[:：]?\s*(\S+)/);
+      if (nameMatch) result.name = nameMatch[1];
+    }
+    // 성별
+    if (/성별\s*[:：]?\s*(남성|여성|남자|여자)/.test(line)) {
+      const gMatch = line.match(/성별\s*[:：]?\s*(남성|여성|남자|여자)/);
+      if (gMatch) result.gender = gMatch[1].includes('남') ? '남성' : '여성';
+    }
+    if (!result.gender && /\b(남성|여성)\b/.test(line)) {
+      result.gender = line.includes('남성') ? '남성' : '여성';
+    }
+    // 나이 - "만 30세" 또는 "나이: 30" 형식
+    const ageMatch = line.match(/만?\s*(\d{1,3})\s*세/);
+    if (ageMatch && !result.age) result.age = parseInt(ageMatch[1]);
+    if (!result.age) {
+      const ageMatch2 = line.match(/나이\s*[:：]?\s*(?:만\s*)?(\d{1,3})/);
+      if (ageMatch2) result.age = parseInt(ageMatch2[1]);
+    }
+
+    // ── 건강검진 이력 ──
+    if (currentSection === 'checkup' || /신장\s*[:：]?\s*\d|체중\s*[:：]?\s*\d/.test(line)) {
+      // 신장
+      const htMatch = line.match(/신장\s*[:：]?\s*([\d.]+)/);
+      if (htMatch) result.height = parseFloat(htMatch[1]);
+      // 체중
+      const wtMatch = line.match(/체중\s*[:：]?\s*([\d.]+)/);
+      if (wtMatch) result.weight = parseFloat(wtMatch[1]);
+      // 허리둘레
+      const waistMatch = line.match(/허리\s*(?:둘레)?\s*[:：]?\s*([\d.]+)/);
+      if (waistMatch) result.waist = parseFloat(waistMatch[1]);
+      // 체질량지수/BMI
+      const bmiMatch = line.match(/(?:체질량\s*지수|BMI)\s*[:：]?\s*([\d.]+)/);
+      if (bmiMatch) result.bmi = parseFloat(bmiMatch[1]);
+      // 혈압 - "121/68"
+      const bpMatch = line.match(/혈압\s*[:：]?\s*(\d{2,3}\s*\/\s*\d{2,3})/);
+      if (bpMatch) result.bp = bpMatch[1].replace(/\s/g, '');
+      // AST(SGOT)
+      const astMatch = line.match(/AST\s*(?:\(S?GOT\))?\s*[:：]?\s*([\d.]+)/i);
+      if (astMatch && !result.bloodTests.ast) result.bloodTests.ast = parseFloat(astMatch[1]);
+      // ALT(SGPT)
+      const altMatch = line.match(/ALT\s*(?:\(S?GPT\))?\s*[:：]?\s*([\d.]+)/i);
+      if (altMatch && !result.bloodTests.alt) result.bloodTests.alt = parseFloat(altMatch[1]);
+      // 혈색소
+      const hbMatch = line.match(/혈색소\s*[:：]?\s*([\d.]+)/);
+      if (hbMatch && !result.bloodTests.hb) result.bloodTests.hb = parseFloat(hbMatch[1]);
+      // 식전혈당
+      const glucoseMatch = line.match(/식전\s*혈당\s*[:：]?\s*([\d.]+)/);
+      if (glucoseMatch && !result.bloodTests.glucose) result.bloodTests.glucose = parseFloat(glucoseMatch[1]);
+      // 총콜레스테롤
+      const tcMatch = line.match(/총\s*콜레스테롤\s*[:：]?\s*([\d.]+)/);
+      if (tcMatch && tcMatch[1] !== '-') result.bloodTests.tc = parseFloat(tcMatch[1]);
+      // HDL
+      const hdlMatch = line.match(/HDL\s*(?:콜레스테롤)?\s*[:：]?\s*([\d.]+)/);
+      if (hdlMatch && hdlMatch[1] !== '-') result.bloodTests.hdl = parseFloat(hdlMatch[1]);
+      // LDL
+      const ldlMatch = line.match(/LDL\s*(?:콜레스테롤)?\s*[:：]?\s*([\d.]+)/);
+      if (ldlMatch && ldlMatch[1] !== '-') result.bloodTests.ldl = parseFloat(ldlMatch[1]);
+      // 중성지방
+      const tgMatch = line.match(/중성\s*지방\s*[:：]?\s*([\d.]+)/);
+      if (tgMatch && tgMatch[1] !== '-') result.bloodTests.tg = parseFloat(tgMatch[1]);
+      // 혈청크레아티닌
+      const crMatch = line.match(/(?:혈청\s*)?크레아티닌\s*[:：]?\s*([\d.]+)/);
+      if (crMatch) result.creatinine = parseFloat(crMatch[1]);
+      // 검진일자
+      const dateMatch = line.match(/검진\s*일자\s*[:：]?\s*([\d.]+)/);
+      if (dateMatch) result.checkupDate = dateMatch[1];
+    }
+
+    // ── 문진결과 ──
+    if (currentSection === 'interview') {
+      // 질환력
+      if (/질환력|질환명/.test(line)) currentSection = 'interview_disease';
+      // 흡연
+      if (/흡연\s*(?:여부)?/.test(line)) {
+        if (/X|비흡연|안\s*함|없/.test(line) || (lines[i + 1] && /^X$/.test(lines[i + 1]?.trim()))) {
+          result.lifestyle.smoking = '비흡연';
+        } else if (/현재|피움|O/.test(line)) {
+          result.lifestyle.smoking = '현재 흡연';
+        } else if (/금연|과거/.test(line)) {
+          result.lifestyle.smoking = '과거 흡연(금연)';
+        }
+      }
+      // 신체활동
+      if (/고강도|중강도|근력운동|신체활동/.test(line)) {
+        const freqMatch = line.match(/주\s*(\d+)\s*회/);
+        if (freqMatch) {
+          const freq = parseInt(freqMatch[1]);
+          if (freq >= 5) result.lifestyle.exercise = '주 5회 이상';
+          else if (freq >= 3) result.lifestyle.exercise = '주 3~4회';
+          else result.lifestyle.exercise = '주 1~2회';
+        }
+      }
+      // 음주
+      if (/음주/.test(line) || /일주일에|주\s*\d+\s*번|주\s*\d+\s*회/.test(line)) {
+        const drinkMatch = line.match(/(\d+)\s*번|(\d+)\s*회/);
+        if (drinkMatch) {
+          const freq = parseInt(drinkMatch[1] || drinkMatch[2]);
+          if (freq >= 5) result.lifestyle.alcohol = '거의 매일';
+          else if (freq >= 3) result.lifestyle.alcohol = '주 3~4회';
+          else if (freq >= 1) result.lifestyle.alcohol = '주 1~2회';
+        }
+      }
+    }
+
+    // 질환력 파싱 - 다음 줄에 질환명이 올 수 있음
+    if (currentSection === 'interview_disease') {
+      const condKeywords = {
+        '고혈압': '고혈압', '당뇨': '당뇨병(2형)', '이상지질': '이상지질혈증',
+        '갑상선.*저하': '갑상선기능저하증', '갑상선.*항진': '갑상선기능항진증',
+        '골다공': '골다공증', '골감소': '골감소증', '지방간': '지방간',
+        '빈혈': '빈혈', '관절': '관절염', '통풍': '통풍',
+        '우울|불안': '우울증/불안장애', '역류|GERD': '위식도역류질환(GERD)',
+        '과민성.*장|IBS': '과민성대장증후군(IBS)', '전립선': '전립선비대증',
+        '천식|알레르기': '천식/알레르기', '만성신장': '만성신장질환'
+      };
+      for (const [pattern, condName] of Object.entries(condKeywords)) {
+        if (new RegExp(pattern).test(line)) {
+          if (/가족력|가족/.test(line)) {
+            // 가족력은 본인 질환이 아님 → familyHistory에만 추가
+            if (!result.familyHistory.includes(condName)) result.familyHistory.push(condName);
+          } else {
+            // 본인 질환
+            if (!result.conditions.includes(condName)) result.conditions.push(condName);
+          }
+        }
+      }
+      if (/흡연|신체활동|음주/.test(line)) currentSection = 'interview'; // 다음 섹션으로
+    }
+
+    // ── 장기 복용약 / 복약 이력 ──
+    if (currentSection === 'longterm_med' || currentSection === 'prescription' || currentSection === 'otc_med') {
+      // 약품명 감지 - "프로페시아정1밀리그람" 같은 형식
+      if (/정\d*(?:밀리|마이크로)?|캡슐|시럽|산$/.test(line) && !/약품명|약품코드|제품명|약국|기관|조제|함량|투약/.test(line) && line.length < 50) {
+        const medName = line.replace(/\s*\d{6,}.*/, '').trim(); // 약품코드 제거
+        if (medName && !result.medications.includes(medName) && !/없습니다|정보가/.test(medName)) {
+          result.medications.push(medName);
+        }
+      }
+      // "약품명" 열 값으로 올 수 있는 일반적 형태
+      if (/\d{6,}/.test(line) && /정|캡슐/.test(line)) {
+        const parts = line.split(/\s+/);
+        const medPart = parts.find(p => /정|캡슐/.test(p) && p.length > 2);
+        if (medPart && !result.medications.includes(medPart)) result.medications.push(medPart);
+      }
+    }
+
+    // ── 유전자 검사 ──
+    if (currentSection === 'genetic') {
+      if (/비타민|칼슘|철|마그네슘|오메가|코엔자임|루테인|셀렌|아연|엽산/.test(line)) {
+        const statusMatch = line.match(/(주의|양호|결핍|부족|정상|위험|높음|낮음)/);
+        if (statusMatch) {
+          result.geneticTests.push({item: line.replace(statusMatch[0], '').replace(/[:：\s]/g, '').trim(), status: statusMatch[1]});
+        }
+      }
+    }
+
+    // ── 향후 관리 분야 ──
+    if (currentSection === 'mgmt_area') {
+      if (/해당\s*없음/.test(line)) { currentSection = ''; continue; }
+      const items = line.split(/[,，\s·\/]+/).filter(i => i.length > 1);
+      for (const item of items) {
+        matchConcern(item, result.concerns);
+      }
+    }
+
+    // ── 섭취중인 영양제 ──
+    if (currentSection === 'current_supp') {
+      if (/해당\s*없음/.test(line)) { currentSection = ''; continue; }
+      result.currentSupplements += line + '\n';
+    }
+
+    // ── 범용 패턴 (섹션 무관하게 작동) ──
+
+    // 이름 (어드민: "이름 [value]" 또는 "이름: value")
+    if (/^이름\s/.test(line) && !result.name) {
+      result.name = line.replace(/^이름\s*[:：]?\s*/, '').trim();
+    }
+
+    // 키/체중 (범용)
+    if (!result.height) {
+      const htMatch = line.match(/(?:키|신장)\s*[:：]?\s*([\d.]+)/);
+      if (htMatch) result.height = parseFloat(htMatch[1]);
+    }
+    if (!result.weight) {
+      const wtMatch = line.match(/체중\s*[:：]?\s*([\d.]+)/);
+      if (wtMatch) result.weight = parseFloat(wtMatch[1]);
+    }
+
+    // 혈액검사 범용 패턴
+    const bloodPatterns = [
+      {regex:/(?:비타민\s*D|VitD|25.*OH.*D)\s*[:：]?\s*([\d.]+)/i, key:'vitD'},
+      {regex:/(?:페리틴|ferritin)\s*[:：]?\s*([\d.]+)/i, key:'ferritin'},
+      {regex:/(?:비타민\s*B12|B12)\s*[:：]?\s*([\d.]+)/i, key:'b12'},
+      {regex:/(?:호모시스테인|homocysteine)\s*[:：]?\s*([\d.]+)/i, key:'homocys'},
+      {regex:/(?:HbA1c|당화혈색소)\s*[:：]?\s*([\d.]+)/i, key:'hba1c'},
+      {regex:/(?:TSH)\s*[:：]?\s*([\d.]+)/i, key:'tsh'},
+    ];
+    for (const bp of bloodPatterns) {
+      const m = line.match(bp.regex);
+      if (m && !result.bloodTests[bp.key]) result.bloodTests[bp.key] = parseFloat(m[1]);
+    }
+
+    // 임신/수유
+    if (/임신|수유/.test(line)) {
+      if (/준비/.test(line)) result.pregnancy = '임신 준비 중';
+      else if (/초기/.test(line)) result.pregnancy = '임신 중(초기)';
+      else if (/중기/.test(line)) result.pregnancy = '임신 중(중기)';
+      else if (/후기/.test(line)) result.pregnancy = '임신 중(후기)';
+      else if (/수유/.test(line)) result.pregnancy = '수유 중';
+    }
+
+    // 알레르기
+    if (/알레르기|알러지/.test(line)) {
+      if (/갑각|조개|새우|게/.test(line)) result.allergies.push('조개류/갑각류');
+      if (/대두|콩/.test(line)) result.allergies.push('대두(콩)');
+      if (/유제품|우유|유당/.test(line)) result.allergies.push('유제품');
+      if (/글루텐|밀/.test(line)) result.allergies.push('글루텐');
+      if (/견과|호두|아몬드/.test(line)) result.allergies.push('견과류');
+    }
+
+    // 관심분야 키워드 (범용)
+    if (/관심|관리.*분야|고민|증상|호소|신경/.test(line)) {
+      const afterColon = line.replace(/.*[:：]\s*/, '');
+      const items = afterColon.split(/[,，\s·\/]+/).filter(i => i.length > 1);
+      for (const item of items) matchConcern(item, result.concerns);
+    }
+
+    // 메모/기타
+    if (/메모|비고|참고|특이|호소|기타|코멘트/.test(line) && !/작성해주세요/.test(line)) {
+      const content = line.replace(/.*[:：]\s*/, '').trim();
+      if (content && !/^$/.test(content)) result.memo += content + '\n';
+    }
+  }
+
+  // 전체 텍스트에서 추가 감지
+  if (!result.gender) {
+    if (/여성|여자/.test(text)) result.gender = '여성';
+    else if (/남성|남자/.test(text)) result.gender = '남성';
+  }
+  if (!result.age) {
+    const globalAge = text.match(/만?\s*(\d{2})\s*세/);
+    if (globalAge) result.age = parseInt(globalAge[1]);
+  }
+
+  // 약물 전역 스캔 (프로페시아, 피나스테리드 등 특수 약물 포함)
+  const knownDrugs = [
+    {names:['프로페시아','피나스테리드','프로페시아정'], note:'5α환원효소억제제(탈모약)', concerns:['피부·탈모']},
+    {names:['오뉴페시아','두타스테리드','아보다트'], note:'5α환원효소억제제', concerns:['피부·탈모']},
+    {names:['미녹시딜'], note:'탈모치료 외용제', concerns:['피부·탈모']},
+    {names:['메트포르민','글루코파지'], note:'당뇨약'},
+    {names:['아토르바스타틴','리피토','로수바스타틴','크레스토','심바스타틴'], note:'스타틴'},
+    {names:['오메프라졸','판토프라졸','에소메프라졸','넥시움','란소프라졸'], note:'PPI'},
+    {names:['레보티록신','씬지로이드'], note:'갑상선약'},
+    {names:['암로디핀','텔미사르탄','로사르탄','발사르탄','라미프릴','에날라프릴'], note:'혈압약'},
+    {names:['아스피린','와파린','클로피도그렐'], note:'항응고/항혈소판'},
+    {names:['에스시탈로프람','설트랄린','플루옥세틴'], note:'항우울제'},
+    {names:['탐스로신'], note:'전립선약'},
+    {names:['알렌드로네이트'], note:'골다공증약'},
+    {names:['경구피임약','레보노르게스트렐'], note:'경구피임약'},
+    {names:['HCTZ','히드로클로로티아지드'], note:'이뇨제'},
+    {names:['레보도파','카르비도파'], note:'파킨슨약'},
+  ];
+  for (const drugInfo of knownDrugs) {
+    for (const name of drugInfo.names) {
+      if (text.includes(name) && !result.medications.some(m => m.includes(name))) {
+        const regex = new RegExp(name + '[^\\n]*(?:밀리그[람람]|mg|mcg|정)?', 'i');
+        const match = text.match(regex);
+        result.medications.push(match ? match[0].trim() : name);
+        // 관련 관심사 자동 추가
+        if (drugInfo.concerns) {
+          for (const c of drugInfo.concerns) {
+            if (!result.concerns.includes(c)) result.concerns.push(c);
+          }
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+// 관심사 키워드 → CATEGORIES 매칭 헬퍼
+function matchConcern(item, concerns) {
+  const map = {
+    '피로|무기력|체력|에너지': '피로', '수면|불면|잠|긴장': '수면·긴장완화',
+    '눈|시력|안구|블루라이트': '눈', '피부|여드름|탈모|머리카락|모발': '피부·탈모',
+    '관절|무릎|허리|연골': '관절·연골', '갱년기|폐경|안면홍조|열감': '갱년기',
+    '다이어트|체중|비만|감량': '다이어트', '면역|감기|잦은감기': '면역력',
+    '혈당|당뇨|인슐린': '혈당', '혈압': '혈압',
+    '콜레스테롤|지질|중성지방': '콜레스테롤', '기억|인지|집중|치매': '기억·인지력',
+    '장|소화|변비|설사|IBS': '장', '간|음주|지방간|간수치': '간',
+    '뼈|골다공|골밀도|골감소': '뼈', '전립선|배뇨|야간뇨': '전립선',
+    '생리|월경|PMS': '월경전증후군', '항노화|노화|안티에이징': '항노화',
+    '구강|치아|잇몸': '구강·치아', '혈행|혈류|순환': '혈행',
+    '신장|요로': '신장·요로'
+  };
+  for (const [pattern, cat] of Object.entries(map)) {
+    if (new RegExp(pattern).test(item) && !concerns.includes(cat)) {
+      concerns.push(cat);
+    }
+  }
+  // 정확 매칭
+  const exact = CATEGORIES.find(c => c === item || c.includes(item) || item.includes(c.replace(/[·]/g, '')));
+  if (exact && !concerns.includes(exact)) concerns.push(exact);
+}
+
+// 영양소명 볼드 처리 (HTML)
+function boldNutrients(text) {
+  const nutrients = ['비타민A','비타민B1','비타민B2','비타민B6','비타민B12','비타민C','비타민D','비타민E','비타민K',
+    '나이아신','판토텐산','엽산','비오틴','칼슘','마그네슘','철분','철','아연','셀렌','구리','크롬','요오드',
+    'EPA\\+DHA','EPA','DHA','오메가3','CoQ10','코엔자임Q10','루테인','지아잔틴','아스타잔틴',
+    '프로바이오틱스','실리마린','밀크씨슬','MSM','쏘팔메토','감마리놀렌산','L-테아닌','홍경천',
+    '코로솔산','포스파티딜세린','은행잎추출물','가르시니아','HCA','비오틴','로르산','옥타코사놀'];
+  let result = text;
+  for (const n of nutrients) {
+    result = result.replace(new RegExp(`(${n})`, 'g'), '<strong style="color:var(--primary)">$1</strong>');
+  }
+  return result;
+}
+
+function getAgeGroup(age) {
+  if (!age) return '30대';
+  if (age < 30) return '20대';
+  if (age < 40) return '30대';
+  if (age < 50) return '40대';
+  if (age < 60) return '50대';
+  return '60대이상';
+}
+
+async function generateAIDraft() {
+  // OCR 이미지가 있으면 먼저 처리
+  const pendingImages = ocrImages.filter(x => x && x.status === 'pending');
+  if (pendingImages.length) {
+    await runOCROnImages();
+  }
+
+  const inputText = document.getElementById('ai-admin-input').value;
+  const extraNotes = document.getElementById('ai-extra-notes').value;
+  const pharmacistName = document.getElementById('ai-pharmacist-name')?.value || '송은주';
+  const pharmacyName = document.getElementById('ai-pharmacy-name')?.value || '아이맘약국';
+
+  if (!inputText.trim()) {
+    alert('메디코치 어드민 상담 내용을 붙여넣거나 이미지를 업로드해 주세요.');
+    return;
+  }
+
+  // 1. 파싱
+  const parsed = parseAdminInput(inputText);
+
+  // 2. 연령대 가이드
+  const ageGroup = getAgeGroup(parsed.age);
+  const genderKey = parsed.gender === '남성' ? 'male' : 'female';
+  const ageGuide = AGE_NUTRIENT_GUIDE[ageGroup]?.[genderKey] || {base:[], lifestyle:{}};
+
+  // 3. 드럭머거 분석
+  const muggerResults = [];
+  for (const mugger of DRUG_MUGGERS) {
+    for (const med of parsed.medications) {
+      const medLow = med.toLowerCase();
+      if (mugger.drugs.some(d => medLow.includes(d.toLowerCase()) || d.toLowerCase().includes(medLow.split(' ')[0]))) {
+        for (const dep of mugger.depleted) {
+          if (!muggerResults.find(r => r.nutrient === dep.n && r.drug === med)) {
+            muggerResults.push({drug: med, nutrient: dep.n, reason: dep.reason, rec: dep.rec});
+          }
+        }
+      }
+    }
+  }
+
+  // 4. 혈액검사 분석
+  const bloodResults = [];
+  for (const m of BLOOD_MARKERS) {
+    const val = parsed.bloodTests[m.id];
+    if (val == null) continue;
+    const ranges = m.genderRanges ? (parsed.gender === '여성' ? m.rangesF : m.rangesM) : m.ranges;
+    for (const r of ranges) {
+      if (val <= r.max) {
+        bloodResults.push({marker: m.name, value: val, unit: m.unit, status: r.s, rec: r.r, abnormal: !['정상','적절','최적'].includes(r.s)});
+        break;
+      }
+    }
+  }
+
+  // 5. 질환별 영양소 추천
+  const conditionRecs = [];
+  for (const cond of parsed.conditions) {
+    const guide = CONDITION_NUTRIENT_GUIDE[cond];
+    if (guide) conditionRecs.push({condition: cond, ...guide});
+  }
+  // 가족력도 예방적 관리 참고로 추가
+  for (const fh of parsed.familyHistory) {
+    const guide = CONDITION_NUTRIENT_GUIDE[fh];
+    if (guide && !conditionRecs.find(r => r.condition.includes(fh))) {
+      conditionRecs.push({condition: `${fh} (가족력 - 건강 관리 참고)`, ...guide});
+    }
+  }
+  // 탈모약(프로페시아 등) 복용 시 탈모(AGA) 근거 자동 추가
+  if (parsed.medications.some(m => /프로페시아|피나스테리드|두타스테리드|오뉴페시아|아보다트|미녹시딜/.test(m))) {
+    const agaGuide = CONDITION_NUTRIENT_GUIDE['탈모(AGA)'];
+    if (agaGuide && !conditionRecs.find(r => r.condition === '탈모(AGA)')) {
+      conditionRecs.push({condition: '탈모(AGA) - 약물 치료 병행 중', ...agaGuide});
+    }
+  }
+
+  // 6. 제품 추천 로직
+  const recommendedProducts = {essential: [], optional: []};
+  const recReasons = {};
+
+  // 드럭머거 기반 필수 추천
+  for (const mr of muggerResults) {
+    if (mr.rec && !recommendedProducts.essential.find(r => r.id === mr.rec)) {
+      recommendedProducts.essential.push({id: mr.rec, reason: `드럭머거: ${mr.drug} → ${mr.nutrient} 고갈 보충`});
+      recReasons[mr.rec] = recReasons[mr.rec] || [];
+      recReasons[mr.rec].push(`${mr.drug}에 의한 ${mr.nutrient} 고갈`);
+    }
+  }
+
+  // 혈액검사 기반 필수 추천
+  for (const br of bloodResults) {
+    if (br.rec && br.abnormal && !recommendedProducts.essential.find(r => r.id === br.rec)) {
+      recommendedProducts.essential.push({id: br.rec, reason: `혈액검사: ${br.marker} ${br.value}${br.unit} (${br.status})`});
+      recReasons[br.rec] = recReasons[br.rec] || [];
+      recReasons[br.rec].push(`${br.marker} ${br.status} (${br.value}${br.unit})`);
+    }
+  }
+
+  // 질환별 영양소 → 제품 매칭
+  const condNutrientToProduct = {
+    '마그네슘': 'MC-MAG400', 'EPA+DHA': 'MC-OMEGA3', 'CoQ10': 'MC-COQ10',
+    '크롬': 'MC-BLOOD-SUGAR', '코로솔산': 'MC-BLOOD-SUGAR',
+    '비타민D': 'MC-VITD', '칼슘': 'MC-BONE', '비타민K': 'MC-BONE',
+    '철': 'MC-HEM-IRON', '엽산': 'MC-MULTI', '비타민B12': 'MC-MULTI',
+    '비타민C': 'MC-VITC', '셀렌': 'MC-LUTEIN', '아연': 'MC-LUTEIN',
+    '프로바이오틱스': 'MC-PROBIOTICS', '실리마린': 'MC-MILKTHISTLE',
+    'MSM': 'MC-JOINT-MSM', '쏘팔메토': 'MC-SAW-PALMETTO',
+    '감마리놀렌산': 'MC-PMS', 'L-테아닌': 'MC-ANTI-STRESS',
+    '비오틴': 'MC-PANTO-BIOTIN', '판토텐산': 'MC-PANTO-BIOTIN',
+    '포스파티딜세린': 'MC-MEMORY-PS', '은행잎추출물': 'MC-GINKGO',
+    '루테인': 'MC-LUTEIN',
+  };
+  for (const cr of conditionRecs) {
+    for (const nutrientDesc of cr.nutrients) {
+      // 영양소명 추출 (첫 단어 또는 " - " 앞부분)
+      const nutrientName = nutrientDesc.split(' - ')[0].split('(')[0].trim();
+      const prodId = condNutrientToProduct[nutrientName];
+      if (prodId && !recommendedProducts.essential.find(r => r.id === prodId) && !recommendedProducts.optional.find(r => r.id === prodId)) {
+        const isEssential = parsed.conditions.length > 0 && !parsed.familyHistory.includes(cr.condition);
+        const target = isEssential ? recommendedProducts.essential : recommendedProducts.optional;
+        target.push({id: prodId, reason: `${cr.condition} 관련: ${nutrientDesc.split(' - ')[0]}`});
+        recReasons[prodId] = recReasons[prodId] || [];
+        recReasons[prodId].push(`${cr.condition} - ${nutrientName}`);
+      }
+    }
+  }
+
+  // 관심사 기반 제품 매칭
+  for (const concern of parsed.concerns) {
+    const matchingProducts = PRODUCTS.filter(p => p.cat.includes(concern));
+    for (const p of matchingProducts) {
+      if (!recommendedProducts.essential.find(r => r.id === p.id) && !recommendedProducts.optional.find(r => r.id === p.id)) {
+        recommendedProducts.optional.push({id: p.id, reason: `관리 분야 "${concern}" 대응`});
+        recReasons[p.id] = recReasons[p.id] || [];
+        recReasons[p.id].push(`${concern} 관리`);
+      }
+    }
+  }
+
+  // 기본 필수 (비타민D - 거의 항상)
+  if (!recommendedProducts.essential.find(r => r.id === 'MC-VITD') && !recommendedProducts.optional.find(r => r.id === 'MC-VITD')) {
+    recommendedProducts.optional.push({id: 'MC-VITD', reason: `한국인의 비타민D 결핍률이 높으며, 야외 활동이 많지 않으시다면 보충을 권장드립니다`});
+  }
+
+  // 멀티비타민 기본 추천 (40대 이하, 약물 없으면)
+  if (parsed.age && parsed.age <= 50 && !recommendedProducts.essential.find(r => r.id === 'MC-MULTI')) {
+    recommendedProducts.optional.push({id: 'MC-MULTI', reason: '기본 영양 베이스 보충'});
+  }
+
+  // 필수를 5개 이내로 제한, 나머지는 선택으로
+  while (recommendedProducts.essential.length > 5) {
+    recommendedProducts.optional.unshift(recommendedProducts.essential.pop());
+  }
+
+  // 7. 스크리닝 시뮬레이션
+  const allRecIds = [...recommendedProducts.essential, ...recommendedProducts.optional.slice(0, 3)].map(r => r.id);
+  const simTotals = {};
+  for (const pid of allRecIds) {
+    const p = PRODUCTS.find(x => x.id === pid);
+    if (!p) continue;
+    for (const ing of p.ing) {
+      if (!simTotals[ing.n]) simTotals[ing.n] = {total: 0, unit: ing.u, sources: []};
+      simTotals[ing.n].total += ing.a;
+      simTotals[ing.n].sources.push({product: p.name, amount: ing.a});
+    }
+  }
+  const simAlerts = [];
+  for (const [nutrient, data] of Object.entries(simTotals)) {
+    const ulInfo = UL[nutrient] || {};
+    const limit = ulInfo.ul || ulInfo.practical;
+    if (limit && data.total > limit) {
+      simAlerts.push({type: 'exceed', nutrient, total: data.total, unit: data.unit, limit, pct: Math.round(data.total / limit * 100), tox: ulInfo.tox || '', sources: data.sources});
+    } else if (limit && data.total >= limit * 0.8) {
+      simAlerts.push({type: 'warning', nutrient, total: data.total, unit: data.unit, limit, pct: Math.round(data.total / limit * 100), sources: data.sources});
+    }
+    if (data.sources.length > 1) {
+      simAlerts.push({type: 'duplicate', nutrient, total: data.total, unit: data.unit, count: data.sources.length, sources: data.sources});
+    }
+  }
+
+  // 특수 주의사항
+  const simSpecials = [];
+  if (simTotals['칼슘'] && simTotals['철']) simSpecials.push('칼슘+철 동시 포함 → 최소 2시간 간격 분리 복용');
+  const simZn = simTotals['아연']?.total || 0, simCu = simTotals['구리']?.total || 0;
+  if (simZn >= 25 && simCu < 1) simSpecials.push(`아연 ${simZn}mg 고용량 + 구리 ${simCu}mg → 장기 복용 시 구리 결핍 위험`);
+  if ((simTotals['비오틴']?.total || 0) >= 250) simSpecials.push(`비오틴 ${simTotals['비오틴'].total}mcg → 혈액검사 48시간 전 중단 필요`);
+
+  // 약물 관련 특수
+  const hasAnticoag = parsed.medications.some(m => /와파린|아스피린|클로피도그렐/.test(m));
+  const hasGinkgo = allRecIds.some(id => ['MC-GINKGO', 'MC-MEMORY-PS'].includes(id));
+  if (hasGinkgo && hasAnticoag) simSpecials.push('은행잎 + 항응고제 → 출혈 위험! 병용 재고 필요');
+  const hasLevo = parsed.medications.some(m => /레보티록신|씬지로이드/.test(m));
+  if (hasLevo) simSpecials.push('레보티록신 복용 중 → 미네랄(칼슘, 철, 마그네슘, 아연) 4시간 간격!');
+
+  // ── 약물-영양소 상호작용 참고 (영양제 상담 관점) ──
+  const nutrientInteractions = [];
+
+  const interactionRules = [
+    {pattern:/프로페시아|피나스테리드|두타스테리드|오뉴페시아/, tips:['탈모 치료 중이므로 비오틴·판토텐산·아연·철분(페리틴 체크)·비타민D 보충이 보조적으로 도움','비오틴 고용량 복용 시 혈액검사(갑상선 등) 48시간 전 중단 필요']},
+    {pattern:/메트포르민/, tips:['비타민B12 흡수↓ → 정기적 B12 수치 확인 및 보충 권장','엽산 흡수 감소 가능 → 멀티비타민으로 보충']},
+    {pattern:/스타틴|아토르바스타틴|로수바스타틴|심바스타틴/, tips:['CoQ10 합성 억제 → CoQ10 보충 권장 (근육통 개선 기대)','비타민D 전환에 간접 영향 → 비타민D 수치 확인','자몽/자몽주스가 일부 스타틴 혈중농도를 높일 수 있으니 피하시는 것이 좋습니다']},
+    {pattern:/오메프라졸|판토프라졸|에소메프라졸|PPI/, tips:['마그네슘·칼슘·비타민B12·철분 흡수↓ → 장기 복용 시 정기 혈액검사 권장','칼슘은 시트레이트 형태가 위산 없이도 흡수 양호']},
+    {pattern:/레보티록신|씬지로이드/, tips:['칼슘·철·마그네슘·아연 등 미네랄이 흡수를 방해 → 레보티록신 복용 후 최소 4시간 간격 두고 영양제 복용','커피·두유도 간격 필요']},
+    {pattern:/와파린/, tips:['비타민K 함유 건기식(예: 멀티비타민 내 비타민K) 섭취량 일정하게 유지','오메가3 고용량(>2g)은 출혈 위험↑ → 저용량 유지','은행잎 추출물 병용 주의(출혈 위험)','새로운 건기식 추가 전 반드시 의사/약사와 상의']},
+    {pattern:/아스피린|클로피도그렐/, tips:['오메가3·은행잎 병용 시 출혈 위험 모니터링','고용량 비타민E도 출혈 경향↑ 가능']},
+    {pattern:/에스시탈로프람|설트랄린|SSRI|SNRI/, tips:['세인트존스워트(St. John\'s Wort) 함유 건기식 절대 금기!','엽산·B12 보충이 항우울 치료 반응 개선에 도움','오메가3(EPA 위주)도 보조적 효과 근거 있음']},
+    {pattern:/알렌드로네이트|비스포스포네이트/, tips:['비스포스포네이트 복용 후 30분~2시간은 미네랄 영양제 복용 회피','비타민D+칼슘 보충은 골다공증 치료의 필수 병행']},
+    {pattern:/경구피임약|피임약/, tips:['비타민B6·엽산·마그네슘·아연 소모↑ → 멀티비타민 보충 권장','향후 임신 계획 시 엽산 사전 보충 매우 중요']},
+  ];
+
+  for (const rule of interactionRules) {
+    if (parsed.medications.some(m => rule.pattern.test(m))) {
+      nutrientInteractions.push({
+        drug: parsed.medications.find(m => rule.pattern.test(m)),
+        tips: rule.tips
+      });
+    }
+  }
+
+  // ========== 렌더링 ==========
+  document.getElementById('ai-draft-result').style.display = '';
+
+  // --- 1. 고객 상태 종합 리뷰 ---
+  let reviewHtml = `<div style="font-size:14px;line-height:1.8">`;
+  reviewHtml += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">`;
+  reviewHtml += `<div class="alert alert-info" style="margin:0"><strong>기본 정보</strong><br>${parsed.gender || '미확인'} / ${parsed.age || '?'}세 (${ageGroup})`;
+  if (parsed.height && parsed.weight) {
+    const bmi = (parsed.weight / ((parsed.height / 100) ** 2)).toFixed(1);
+    reviewHtml += `<br>BMI ${bmi} (${bmi < 18.5 ? '저체중' : bmi < 25 ? '정상' : bmi < 30 ? '과체중' : '비만'})`;
+  }
+  if (parsed.pregnancy !== '해당 없음') reviewHtml += `<br>${parsed.pregnancy}`;
+  reviewHtml += `</div>`;
+  reviewHtml += `<div class="alert alert-info" style="margin:0"><strong>관심 분야</strong><br>${parsed.concerns.length ? parsed.concerns.join(', ') : '명시되지 않음'}</div>`;
+  reviewHtml += `</div>`;
+
+  if (parsed.conditions.length) {
+    reviewHtml += `<div class="alert alert-warning"><strong>기저질환:</strong> ${parsed.conditions.join(', ')}</div>`;
+  }
+  if (parsed.familyHistory.length) {
+    reviewHtml += `<div class="alert alert-info"><strong>가족력:</strong> ${parsed.familyHistory.join(', ')} (본인 질환 아님, 건강 관리 시 참고)</div>`;
+  }
+  if (parsed.medications.length) {
+    reviewHtml += `<div class="alert alert-warning"><strong>복용 약물:</strong> ${parsed.medications.join(', ')}</div>`;
+  }
+  if (muggerResults.length) {
+    reviewHtml += `<div class="alert alert-danger"><strong>드럭머거 감지 (${muggerResults.length}건):</strong><br>`;
+    for (const mr of muggerResults) {
+      reviewHtml += `• ${mr.drug} → <strong>${mr.nutrient}</strong> 고갈 (${mr.reason})<br>`;
+    }
+    reviewHtml += `</div>`;
+  }
+  if (bloodResults.length) {
+    const abnormal = bloodResults.filter(b => b.abnormal);
+    const normal = bloodResults.filter(b => !b.abnormal);
+    if (abnormal.length) {
+      reviewHtml += `<div class="alert alert-danger"><strong>혈액검사 이상:</strong><br>`;
+      for (const b of abnormal) reviewHtml += `• ${b.marker}: ${b.value}${b.unit} → <strong>${b.status}</strong><br>`;
+      reviewHtml += `</div>`;
+    }
+    if (normal.length) {
+      reviewHtml += `<div class="alert alert-success"><strong>혈액검사 정상:</strong> ${normal.map(b => `${b.marker} ${b.value}${b.unit}`).join(', ')}</div>`;
+    }
+  }
+
+  // 종합 상태 평가 문장 생성
+  reviewHtml += `<div style="background:#f8fafc;padding:14px;border-radius:8px;margin-top:12px;border:1px solid var(--border)"><strong>종합 평가:</strong><br>`;
+  let assessment = `${parsed.age || '?'}세 ${parsed.gender || ''} `;
+  if (parsed.conditions.length) assessment += `${parsed.conditions.join(', ')}으로 `;
+  if (parsed.medications.length) assessment += `${parsed.medications.join(', ')} 복용 중이며, `;
+  if (muggerResults.length) assessment += `<strong>${muggerResults.length}건의 드럭머거</strong>가 감지되어 영양소 고갈 위험이 있습니다. `;
+  if (bloodResults.filter(b => b.abnormal).length) {
+    const abnNames = bloodResults.filter(b => b.abnormal).map(b => `${b.marker}(${b.status})`);
+    assessment += `혈액검사에서 <strong>${abnNames.join(', ')}</strong> 이상 소견이 확인됩니다. `;
+  }
+  if (parsed.concerns.length) assessment += `${parsed.concerns.join(', ')} 관리를 원하고 있습니다.`;
+  reviewHtml += assessment + `</div></div>`;
+  document.getElementById('ai-review').innerHTML = reviewHtml;
+
+  // --- 2. 영양소 추천 근거 ---
+  let rationaleHtml = `<div style="font-size:14px;line-height:1.8">`;
+  rationaleHtml += `<h4 style="margin-bottom:8px">📌 ${ageGroup} ${parsed.gender || ''} 기본 권장 영양소</h4>`;
+  rationaleHtml += `<div class="alert alert-info" style="line-height:2.2">`;
+  for (const n of ageGuide.base || []) rationaleHtml += `• ${boldNutrients(n)}<br>`;
+  rationaleHtml += `</div>`;
+
+  // 상황별 추천
+  const applicableLifestyle = [];
+  for (const [key, desc] of Object.entries(ageGuide.lifestyle || {})) {
+    const concerns = parsed.concerns.join(' ') + ' ' + (parsed.memo || '');
+    if (key === 'pregnancy' && /임신|수유/.test(concerns + parsed.pregnancy)) applicableLifestyle.push(desc);
+    if (key === 'fatigue' && /피로|무기력/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'hair' && /탈모|머리카락/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'diet' && /다이어트|체중/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'stress' && /스트레스|불안|긴장/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'skin' && /피부|여드름/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'exercise' && /운동/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'eye' && /눈|시력/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'menopause' && /갱년기|폐경/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'pms' && /생리|월경|PMS/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'cardio' && /혈압|심혈관|콜레스테롤/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'metabolic' && /혈당|당뇨|대사/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'liver' && /간|음주/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'prostate' && /전립선|배뇨/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'cognitive' && /기억|인지|집중/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'joint' && /관절|무릎/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'bone' && /골다공|뼈|골밀도/.test(concerns)) applicableLifestyle.push(desc);
+    if (key === 'polypharm' && parsed.medications.length >= 3) applicableLifestyle.push(desc);
+    if (key === 'depression' && /우울|불안|SSRI/.test(concerns + parsed.medications.join(' '))) applicableLifestyle.push(desc);
+  }
+  if (applicableLifestyle.length) {
+    rationaleHtml += `<h4 style="margin:12px 0 8px">🎯 이 고객의 상황별 추천</h4>`;
+    for (const desc of applicableLifestyle) rationaleHtml += `<div class="alert alert-success" style="line-height:2">${boldNutrients(desc)}</div>`;
+  }
+
+  // 질환별 근거
+  if (conditionRecs.length) {
+    rationaleHtml += `<h4 style="margin:12px 0 8px">🏥 질환별 영양소 근거</h4>`;
+    for (const cr of conditionRecs) {
+      rationaleHtml += `<div class="alert alert-warning" style="line-height:2"><strong>${cr.condition}</strong><br>`;
+      rationaleHtml += `${cr.nutrients.map(n => '• ' + boldNutrients(n)).join('<br>')}<br>`;
+      if (cr.avoid) rationaleHtml += `<span style="color:var(--danger)">⚠ 주의: ${boldNutrients(cr.avoid)}</span><br>`;
+      if (cr.note) rationaleHtml += `<small style="color:var(--text-secondary)">💡 ${cr.note}</small>`;
+      rationaleHtml += `</div>`;
+    }
+  }
+
+  // 드럭머거 근거
+  if (muggerResults.length) {
+    rationaleHtml += `<h4 style="margin:12px 0 8px">💊 드럭머거 보충 근거</h4>`;
+    for (const mr of muggerResults) {
+      const prod = PRODUCTS.find(p => p.id === mr.rec);
+      rationaleHtml += `<div class="alert alert-danger" style="line-height:2">`;
+      rationaleHtml += `<strong>${mr.drug}</strong> → ${boldNutrients(mr.nutrient)} 고갈<br>`;
+      rationaleHtml += `<small>기전: ${mr.reason}</small><br>`;
+      rationaleHtml += `보충: <strong>${prod ? prod.name : mr.rec}</strong>`;
+      rationaleHtml += `</div>`;
+    }
+  }
+  rationaleHtml += `</div>`;
+  document.getElementById('ai-nutrient-rationale').innerHTML = rationaleHtml;
+
+  // --- 3. 제품 추천 ---
+  let productHtml = `<div style="font-size:14px;line-height:1.8">`;
+  if (recommendedProducts.essential.length) {
+    productHtml += `<h4 style="color:var(--success);margin-bottom:8px">✅ 필수 추천 (${recommendedProducts.essential.length}개)</h4>`;
+    for (const rec of recommendedProducts.essential) {
+      const p = PRODUCTS.find(x => x.id === rec.id);
+      if (!p) continue;
+      const reasons = recReasons[rec.id] || [rec.reason];
+      productHtml += `<div class="card" style="padding:12px;margin-bottom:8px;border-left:3px solid var(--success)">`;
+      productHtml += `<strong>${p.name}</strong> <span style="color:var(--text-secondary);font-size:12px">(1일 ${p.dose})</span><br>`;
+      productHtml += `<span style="font-size:12px;color:var(--text-secondary)">주요 성분: ${p.ing.slice(0, 5).map(i => i.n + ' ' + i.a + i.u).join(', ')}</span><br>`;
+      // 식약처 인정 기능성 표시
+      const mfdsClaims = p.ing.map(i => MFDS_CLAIMS[i.n]?.claim).filter(c => c);
+      if (mfdsClaims.length) {
+        const uniqueClaims = [...new Set(mfdsClaims)].slice(0, 3);
+        productHtml += `<span style="font-size:11px;color:#6366f1">식약처 인정: ${uniqueClaims.join(' / ')}</span><br>`;
+      }
+      productHtml += `<span style="font-size:13px;color:var(--primary)">상담 근거: ${reasons.join(' / ')}</span>`;
+      productHtml += `</div>`;
+    }
+  }
+  if (recommendedProducts.optional.length) {
+    productHtml += `<h4 style="color:var(--text-secondary);margin:12px 0 8px">💡 선택 추천 (${recommendedProducts.optional.length}개)</h4>`;
+    for (const rec of recommendedProducts.optional.slice(0, 5)) {
+      const p = PRODUCTS.find(x => x.id === rec.id);
+      if (!p) continue;
+      productHtml += `<div class="card" style="padding:12px;margin-bottom:8px;border-left:3px solid var(--border)">`;
+      productHtml += `<strong>${p.name}</strong> <span style="color:var(--text-secondary);font-size:12px">(1일 ${p.dose})</span><br>`;
+      productHtml += `<span style="font-size:13px">${rec.reason}</span>`;
+      productHtml += `</div>`;
+    }
+  }
+  productHtml += `</div>`;
+  document.getElementById('ai-product-rec').innerHTML = productHtml;
+
+  // --- 4. 스크리닝 ---
+  let screenHtml = `<div style="font-size:14px;line-height:1.8">`;
+  const exceeds = simAlerts.filter(a => a.type === 'exceed');
+  const warns = simAlerts.filter(a => a.type === 'warning');
+  const dups = simAlerts.filter(a => a.type === 'duplicate');
+
+  if (exceeds.length) {
+    screenHtml += `<h4 style="color:var(--danger)">🚨 상한량 초과 (${exceeds.length}건)</h4>`;
+    for (const e of exceeds) {
+      screenHtml += `<div class="alert alert-danger"><strong>${e.nutrient}</strong>: ${e.total}${e.unit} → ${e.limit}${e.unit}의 ${e.pct}%<br>`;
+      screenHtml += `<small>출처: ${e.sources.map(s => s.product + '(' + s.amount + ')').join(' + ')}</small>`;
+      if (e.tox) screenHtml += `<br><small>과잉 시: ${e.tox}</small>`;
+      screenHtml += `</div>`;
+    }
+  }
+  if (warns.length) {
+    screenHtml += `<h4 style="color:#92400e">⚠️ 상한량 근접 (${warns.length}건)</h4>`;
+    for (const w of warns) {
+      screenHtml += `<div class="alert alert-warning">${w.nutrient}: ${w.total}${w.unit} (${w.limit}${w.unit}의 ${w.pct}%)<br><small>${w.sources.map(s => s.product + '(' + s.amount + ')').join(' + ')}</small></div>`;
+    }
+  }
+  if (simSpecials.length) {
+    screenHtml += `<h4>⚠️ 특수 주의사항</h4>`;
+    for (const s of simSpecials) screenHtml += `<div class="alert alert-info">${s}</div>`;
+  }
+  if (dups.length) {
+    screenHtml += `<h4>📌 중복 성분 (${dups.length}건)</h4>`;
+    screenHtml += `<table class="screening-table"><thead><tr><th>영양소</th><th>합산</th><th>출처</th></tr></thead><tbody>`;
+    for (const d of dups) {
+      screenHtml += `<tr><td>${d.nutrient}</td><td>${d.total}${d.unit}</td><td style="font-size:11px">${d.sources.map(s => s.product + '(' + s.amount + ')').join(', ')}</td></tr>`;
+    }
+    screenHtml += `</tbody></table>`;
+  }
+  if (!exceeds.length && !warns.length && !simSpecials.length) {
+    screenHtml += `<div class="alert alert-success">추천 조합에서 상한량 초과 및 주요 주의사항이 없습니다.</div>`;
+  }
+
+  // 약물-영양소 상호작용 참고
+  if (nutrientInteractions.length) {
+    screenHtml += `<h4 style="margin-top:16px">💊 약물-영양소 상호작용 참고</h4>`;
+    for (const ni of nutrientInteractions) {
+      screenHtml += `<div class="alert alert-info"><strong>💊 ${ni.drug}</strong><ul style="margin:6px 0 0 16px;font-size:13px">`;
+      for (const tip of ni.tips) screenHtml += `<li>${tip}</li>`;
+      screenHtml += `</ul></div>`;
+    }
+  }
+
+  screenHtml += `</div>`;
+  document.getElementById('ai-screening-alerts').innerHTML = screenHtml;
+
+  // --- 5. 복용 가이드 & 팔로업 ---
+  let guideHtml = `<div style="font-size:14px;line-height:1.8">`;
+
+  // 복용 시간표
+  const essIds = recommendedProducts.essential.map(r => r.id);
+  const guideTimings = {'아침 식후': [], '점심 식후': [], '저녁 식후': [], '취침 전': []};
+  for (const pid of essIds) {
+    const p = PRODUCTS.find(x => x.id === pid);
+    if (!p) continue;
+    if (['MC-MAG400', 'MC-ANTI-STRESS'].includes(pid)) guideTimings['취침 전'].push(p.name);
+    else if (pid === 'MC-HEM-IRON') guideTimings['점심 식후'].push(p.name + ' (비타민C와 함께)');
+    else if (pid === 'MC-BONE') guideTimings['점심 식후'].push(p.name);
+    else if (pid === 'MC-MILKTHISTLE') guideTimings['저녁 식후'].push(p.name);
+    else if (pid === 'MC-PROBIOTICS') guideTimings['아침 식후'].push(p.name + ' (식전 가능)');
+    else guideTimings['아침 식후'].push(p.name);
+  }
+
+  guideHtml += `<h4>⏰ 권장 복용 시간표</h4><div class="timing-card">`;
+  for (const [time, items] of Object.entries(guideTimings)) {
+    if (items.length) guideHtml += `<div class="timing-slot"><h5>${time}</h5><ul>${items.map(i => '<li>• ' + i + '</li>').join('')}</ul></div>`;
+  }
+  guideHtml += `</div>`;
+
+  // 팔로업
+  guideHtml += `<h4 style="margin-top:16px">📋 팔로업 권장</h4>`;
+  guideHtml += `<div class="alert alert-info">`;
+  guideHtml += `• 복용 시작 후 <strong>4주</strong>: 꾸준히 복용하고 계신지, 불편함은 없는지 확인<br>`;
+  if (bloodResults.filter(b => b.abnormal).length) {
+    guideHtml += `• 정기 검진 시 <strong>${bloodResults.filter(b => b.abnormal).map(b => b.marker).join(', ')}</strong> 수치 추적 확인 권장<br>`;
+  }
+  if (exceeds.length) {
+    guideHtml += `• <strong>UL 초과 성분 조정 필요</strong>: ${exceeds.map(e => e.nutrient).join(', ')} → 약사가 용량/조합 재검토<br>`;
+  }
+  guideHtml += `• <strong>3~6개월</strong>: 정기 건강검진 결과에 따라 조합 재검토`;
+  guideHtml += `</div></div>`;
+  document.getElementById('ai-guide').innerHTML = guideHtml;
+
+  // --- 6. 전문 초안 (메디코치 답변용) ---
+  const customerName = parsed.name || 'OOO';
+  const displayName = customerName.replace(/(.)(.)(.+)/, '$1$2$3'); // 이름 그대로 표시
+  let fullDraft = '';
+
+  // 인사말
+  fullDraft += `안녕하세요? ${customerName}님. ${pharmacyName} ${pharmacistName} 약사입니다.\n`;
+  fullDraft += `보내주신 상담 내용을 꼼꼼히 살펴보았습니다.\n`;
+  fullDraft += `${customerName}님의 건강 상태와 생활 패턴을 고려해서 맞춤 영양 상담을 드리겠습니다.\n\n`;
+
+  // 건강 정보 요약
+  fullDraft += `■ ${customerName}님 건강 정보\n`;
+  fullDraft += `${parsed.gender || ''} / ${parsed.age || '?'}세`;
+  if (parsed.height && parsed.weight) {
+    const bmival = (parsed.weight / ((parsed.height / 100) ** 2)).toFixed(1);
+    fullDraft += ` / 키 ${parsed.height}cm · 체중 ${parsed.weight}kg (BMI ${bmival})`;
+  }
+  fullDraft += `\n`;
+  if (parsed.bp) fullDraft += `혈압 ${parsed.bp}으로 확인됩니다.\n`;
+  if (parsed.conditions.length) fullDraft += `${parsed.conditions.join(', ')}이 있으신 것으로 확인했습니다.\n`;
+  if (parsed.familyHistory.length) fullDraft += `가족분 중 ${parsed.familyHistory.join(', ')} 이력이 있으시군요. 참고하여 상담드리겠습니다.\n`;
+  if (parsed.medications.length) fullDraft += `현재 ${parsed.medications.join(', ')}을(를) 복용 중이신 것으로 확인됩니다.\n`;
+  fullDraft += `\n`;
+
+  // 종합 소견
+  fullDraft += `■ 전반적으로 살펴보면\n`;
+  // assessment에서 HTML 태그 제거하고 부드러운 톤으로
+  let softAssessment = assessment.replace(/<[^>]*>/g, '');
+  fullDraft += softAssessment + `\n\n`;
+
+  // 나이대별 권장 - 영양소명 강조
+  fullDraft += `■ ${ageGroup} ${parsed.gender || ''} 분들께 도움이 되는 영양소\n\n`;
+  for (const n of ageGuide.base || []) {
+    // "영양소명 - 설명" 형식에서 영양소명만 강조
+    const parts = n.split(' - ');
+    if (parts.length >= 2) {
+      fullDraft += `  ▸ ${parts[0]}\n    ${parts.slice(1).join(' - ')}\n\n`;
+    } else {
+      fullDraft += `  ▸ ${n}\n\n`;
+    }
+  }
+  if (applicableLifestyle.length) {
+    fullDraft += `${customerName}님의 상황을 고려하면:\n\n`;
+    for (const desc of applicableLifestyle) fullDraft += `  ▸ ${desc}\n\n`;
+  }
+
+  // 질환/가족력별 영양소
+  if (conditionRecs.length) {
+    fullDraft += `■ ${customerName}님께 특히 참고가 되는 영양 정보\n\n`;
+    for (const cr of conditionRecs) {
+      fullDraft += `  ● ${cr.condition}\n`;
+      for (const nut of cr.nutrients) {
+        const parts = nut.split(' - ');
+        if (parts.length >= 2) {
+          fullDraft += `    ▸ ${parts[0]}\n      ${parts.slice(1).join(' - ')}\n`;
+        } else {
+          fullDraft += `    ▸ ${nut}\n`;
+        }
+      }
+      if (cr.note) fullDraft += `    💡 ${cr.note}\n`;
+      fullDraft += `\n`;
+    }
+  }
+
+  // 약물-영양소 관계
+  if (muggerResults.length) {
+    fullDraft += `■ 복용 중인 약물과 영양소의 관계\n\n`;
+    fullDraft += `현재 드시는 약물에 따라 일부 영양소가 부족해질 수 있어서 안내드립니다.\n\n`;
+    for (const mr of muggerResults) {
+      const prod = PRODUCTS.find(p => p.id === mr.rec);
+      fullDraft += `  ▸ ${mr.drug}\n`;
+      fullDraft += `    → ${mr.nutrient} 보충이 도움이 될 수 있습니다`;
+      if (prod) fullDraft += ` (${prod.name})`;
+      fullDraft += `\n\n`;
+    }
+  }
+
+  // 영양제 복용 시 참고
+  if (nutrientInteractions.length) {
+    fullDraft += `■ 영양제 드실 때 참고해 주세요\n\n`;
+    for (const ni of nutrientInteractions) {
+      for (const tip of ni.tips) fullDraft += `  ▸ ${tip}\n\n`;
+    }
+  }
+
+  // 추천 제품
+  fullDraft += `■ ${customerName}님께 추천드리는 제품 조합\n\n`;
+  if (recommendedProducts.essential.length) {
+    fullDraft += `[ 추천 제품 ]\n\n`;
+    for (const rec of recommendedProducts.essential) {
+      const p = PRODUCTS.find(x => x.id === rec.id);
+      if (!p) continue;
+      const claims = p.ing.map(i => MFDS_CLAIMS[i.n]?.claim).filter(c => c);
+      const topClaim = claims.length ? [...new Set(claims)][0] : '';
+      fullDraft += `  ✔ ${p.name}\n`;
+      fullDraft += `    1일 ${p.dose}\n`;
+      fullDraft += `    ${rec.reason}\n`;
+      if (topClaim) fullDraft += `    (${topClaim})\n`;
+      fullDraft += `\n`;
+    }
+  }
+  if (recommendedProducts.optional.length) {
+    fullDraft += `[ 추가로 고려해 보실 제품 ]\n\n`;
+    for (const rec of recommendedProducts.optional.slice(0, 5)) {
+      const p = PRODUCTS.find(x => x.id === rec.id);
+      if (!p) continue;
+      const claims = p.ing.map(i => MFDS_CLAIMS[i.n]?.claim).filter(c => c);
+      const topClaim = claims.length ? [...new Set(claims)][0] : '';
+      fullDraft += `  ✔ ${p.name}\n`;
+      fullDraft += `    1일 ${p.dose}\n`;
+      fullDraft += `    ${rec.reason}\n`;
+      if (topClaim) fullDraft += `    (${topClaim})\n`;
+      fullDraft += `\n`;
+    }
+  }
+
+  // 성분 주의 (UL 초과 등은 약사용이므로 고객에게는 부드럽게)
+  if (exceeds.length) {
+    fullDraft += `■ 성분 관련 안내\n\n`;
+    fullDraft += `위 조합에서 일부 성분이 겹치는 부분이 있어,\n용량을 조절하거나 조합을 조정해 드릴 수 있습니다.\n걱정하지 마시고 편하게 말씀해 주세요.\n\n`;
+  }
+
+  // 복용 가이드
+  const hasTimingItems = Object.values(guideTimings).some(items => items.length);
+  if (hasTimingItems) {
+    fullDraft += `■ 이렇게 드시면 좋습니다\n\n`;
+    for (const [time, items] of Object.entries(guideTimings)) {
+      if (items.length) fullDraft += `  ${time}\n    → ${items.join(', ')}\n\n`;
+    }
+    fullDraft += `\n`;
+  }
+
+  // 팔로업
+  fullDraft += `■ 앞으로의 건강 관리\n\n`;
+  fullDraft += `  ▸ 한 달 정도 드셔보시고, 혹시 불편하신 점이 있으시면\n    편하게 말씀해 주세요.\n\n`;
+  if (bloodResults.filter(b => b.abnormal).length) fullDraft += `  ▸ 다음 건강검진 때 ${bloodResults.filter(b => b.abnormal).map(b => b.marker).join(', ')} 수치를\n    한번 확인해 보시면 좋겠습니다.\n\n`;
+  fullDraft += `  ▸ 검진 결과에 따라 제품 조합을 다시 살펴드릴 수 있으니\n    언제든 연락 주세요.\n\n`;
+
+  if (extraNotes) {
+    fullDraft += `■ 추가 참고\n${extraNotes}\n\n`;
+  }
+
+  // 마무리
+  fullDraft += `──────────────────────────────────\n\n`;
+  fullDraft += `${customerName}님의 건강한 하루하루를 응원합니다!\n`;
+  fullDraft += `궁금하신 점이나 복용 중 불편하신 부분이 있으시면 언제든 편하게 문의해 주세요.\n\n`;
+  fullDraft += `${pharmacyName} ${pharmacistName} 약사 드림\n\n`;
+  fullDraft += `※ 건강기능식품은 의약품이 아니며, 질병의 진단·치료·예방을 위한 것이 아닙니다.\n`;
+  fullDraft += `※ 기능성 내용은 식품의약품안전처 인정 기준입니다.\n`;
+  fullDraft += `※ 의약품 복용 중이신 분은 담당 의사와 상의 후 섭취를 권장드립니다.\n`;
+
+  document.getElementById('ai-full-draft').textContent = fullDraft;
+
+  // 파싱 결과를 전역에 저장 (상담 폼 적용용)
+  window._aiDraftParsed = parsed;
+  window._aiDraftProducts = recommendedProducts;
+
+  // 스크롤 to 결과
+  document.getElementById('ai-draft-result').scrollIntoView({behavior: 'smooth'});
+}
+
+function copyAIDraft() {
+  const text = document.getElementById('ai-full-draft').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    alert('📋 상담 초안이 클립보드에 복사되었습니다!');
+  }).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('📋 상담 초안이 복사되었습니다!');
+  });
+}
+
+function applyAIDraftToConsult() {
+  const parsed = window._aiDraftParsed;
+  const recs = window._aiDraftProducts;
+  if (!parsed) { alert('먼저 AI 상담 초안을 생성해 주세요.'); return; }
+
+  // 기본정보
+  if (parsed.gender) { document.getElementById('gender').value = parsed.gender; document.getElementById('gender').dispatchEvent(new Event('change')); }
+  if (parsed.age) document.getElementById('age').value = parsed.age;
+  if (parsed.height) document.getElementById('height').value = parsed.height;
+  if (parsed.weight) document.getElementById('weight').value = parsed.weight;
+  calcBMI();
+  if (parsed.pregnancy !== '해당 없음') document.getElementById('pregnancy').value = parsed.pregnancy;
+
+  // 관심분야
+  state.selectedConcerns = [...parsed.concerns];
+  document.querySelectorAll('#concerns-chips .chip').forEach(c => c.classList.toggle('selected', state.selectedConcerns.includes(c.dataset.value)));
+
+  // 기저질환
+  state.selectedConditions = [...parsed.conditions];
+  document.querySelectorAll('#conditions-chips .chip').forEach(c => c.classList.toggle('selected', state.selectedConditions.includes(c.dataset.value)));
+
+  // 알레르기
+  state.selectedAllergies = [...parsed.allergies];
+  document.querySelectorAll('#allergy-chips .chip').forEach(c => c.classList.toggle('selected', state.selectedAllergies.includes(c.dataset.value)));
+
+  // 약물
+  state.medications = [...parsed.medications];
+  renderMedications();
+  analyzeDrugMuggers();
+
+  // 혈액검사
+  for (const m of BLOOD_MARKERS) {
+    const el = document.getElementById('blood-' + m.id);
+    if (el && parsed.bloodTests[m.id] != null) el.value = parsed.bloodTests[m.id];
+  }
+
+  // 생활습관
+  for (const [k, v] of Object.entries(parsed.lifestyle)) {
+    const el = document.getElementById(k);
+    if (el && v) { el.value = v; if (k === 'stress') document.getElementById('stress-val').textContent = v; }
+  }
+
+  // 메모
+  if (parsed.memo) document.getElementById('intake-memo').value = parsed.memo.trim();
+  if (parsed.currentSupplements) document.getElementById('current-supplements').value = parsed.currentSupplements.trim();
+
+  // 제품 선택
+  state.selectedProducts = [...recs.essential.map(r => r.id)];
+  renderProducts();
+
+  alert(`✅ AI 초안 데이터가 상담 폼에 적용되었습니다!\n\n필수 제품 ${recs.essential.length}개가 자동 선택되었습니다.\n→ 내용을 검토/수정한 후 스크리닝을 실행하세요.`);
   goTab('intake');
 }
 
