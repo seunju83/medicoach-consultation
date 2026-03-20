@@ -652,7 +652,7 @@ const PRODUCTS = [
    ing:[{n:"비타민D",a:50,u:"mcg"}]},
   {id:"MC-VITC",name:"비타민C",dose:"1정",cat:["항노화","피부·탈모"],
    ing:[{n:"비타민C",a:500,u:"mg"}]},
-  {id:"MC-PROBIOTICS",name:"프로바이오틱스",dose:"1캡슐",cat:["장","면역력"],
+  {id:"MC-PROBIOTICS",name:"프로바이오틱스",dose:"1캡슐",cat:["장","위","면역력"],
    ing:[{n:"프로바이오틱스",a:30,u:"억 CFU"}]},
   {id:"MC-LUTEIN",name:"루테인지아잔틴 아스타잔틴 플러스",dose:"1캡슐",cat:["눈"],
    ing:[{n:"루테인",a:18.18,u:"mg"},{n:"지아잔틴",a:1.82,u:"mg"},{n:"아스타잔틴",a:4,u:"mg"},{n:"아연",a:8.5,u:"mg"},{n:"셀렌",a:55,u:"mcg"}]},
@@ -760,7 +760,7 @@ const CONDITIONS = [
   "없음","고혈압","당뇨병(2형)","이상지질혈증","갑상선기능저하증","갑상선기능항진증",
   "위식도역류질환(GERD)","과민성대장증후군(IBS)","골다공증","골감소증",
   "관절염","천식/알레르기","우울증/불안장애","빈혈","통풍",
-  "만성신장질환","지방간","자가면역질환","전립선비대증"
+  "만성신장질환","지방간","간기능저하","자가면역질환","전립선비대증"
 ];
 
 const ALLERGIES = ["없음","조개류/갑각류","대두(콩)","유제품","글루텐","견과류","계란"];
@@ -2098,6 +2098,41 @@ const CONDITION_NUTRIENT_GUIDE = {
   '관절염': {nutrients:['MSM - 관절 및 연골 건강에 도움을 줄 수 있음','EPA+DHA - 혈행 개선에 도움을 줄 수 있음','비타민D - 뼈의 형성과 유지에 필요'],avoid:'',note:'MTX 복용 시 엽산 보충 의사와 상의'},
   '전립선비대증': {nutrients:['쏘팔메토 - 전립선 건강의 유지에 도움을 줄 수 있음','아연 - 정상적인 면역기능에 필요, 정상적인 세포분열에 필요','셀렌 - 유해산소로부터 세포를 보호하는 데 필요'],avoid:'',note:'아연 고용량 장기 섭취 시 구리 부족 주의'},
   '탈모(AGA)': {nutrients:['비오틴 - 지방, 탄수화물, 단백질 대사와 에너지 생성에 필요','판토텐산 - 지방, 탄수화물, 단백질 대사와 에너지 생성에 필요','아연 - 정상적인 세포분열에 필요','철 - 체내 산소운반과 혈액생성에 필요','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요'],avoid:'고용량 비타민A 함유 제품',note:'영양 보충은 보조적 역할. 페리틴, 아연, 비타민D, 갑상선 기능 확인 권장'},
+  // ── 신기능·간기능 관련 (제한/주의 중심) ──
+  '만성신장질환': {
+    nutrients:['비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요 (신장 환자에서 활성형 전환 저하로 부족하기 쉬움)','EPA+DHA - 혈행 개선에 도움을 줄 수 있음','프로바이오틱스 - 장 건강 도움'],
+    avoid:'마그네슘 고용량 (신장 배설 저하 → 고마그네슘혈증 위험), 칼륨 함유 제품 (고칼륨혈증 위험), 고용량 비타민A (축적 위험), 고용량 비타민C (옥살산 → 신결석 위험)',
+    note:'신기능 저하 시 보충제 종류와 용량을 반드시 최소화하고, 담당 의사와 상의 후 섭취 권장. eGFR 수치에 따라 권장이 달라질 수 있음',
+    restrict:['MC-MAG400','MC-BONE'] // 마그네슘/칼슘 고함량 제품 제한
+  },
+  '간기능저하': {
+    nutrients:['프로바이오틱스 - 장 건강 도움 (간-장 축 관련)','비타민D - 칼슘과 인이 흡수되고 이용되는 데 필요','EPA+DHA - 혈행 개선에 도움을 줄 수 있음'],
+    avoid:'고용량 비타민A (간독성 위험, 특히 간질환 시 축적), 고용량 나이아신 (간독성 가능), 고용량 철분 (간에 철 축적 시 손상 악화)',
+    note:'간기능이 저하된 경우 보충제 대사에 영향을 줄 수 있으므로, 최소한의 보충제만 선택하고 담당 의사와 상의 권장',
+    restrict:['MC-HEM-IRON'] // 철분 고함량 제한
+  },
+};
+
+// ── 장기 기능별 제품 제한/경고 룰 ──
+const ORGAN_SAFETY_RULES = {
+  kidney: {
+    conditions: ['만성신장질환'],
+    bloodMarkers: {creatinine: {threshold: 1.5, gender_adj: true}}, // 남 1.5+, 여 1.3+
+    restrictProducts: ['MC-MAG400','MC-BONE'], // 직접 제한
+    warnProducts: ['MC-BLOOD-SUGAR','MC-MULTI'], // 경고 (셀렌/크롬/미네랄 포함)
+    restrictNutrients: ['마그네슘','칼륨'], // 성분 기준 제한
+    warnNutrients: ['비타민A','비타민C'], // 고용량 주의
+    message: '신기능이 저하되어 있는 경우, 일부 미네랄(마그네슘, 칼륨 등)의 배설이 감소할 수 있어 보충제 선택에 주의가 필요합니다. 담당 의사와 상의 후 섭취를 권장드립니다.',
+  },
+  liver: {
+    conditions: ['지방간','간기능저하'],
+    bloodMarkers: {ast: {threshold: 80}, alt: {threshold: 80}}, // 경도 이상이 아닌 중등도 이상
+    restrictProducts: ['MC-HEM-IRON'], // 철분 제한
+    warnProducts: ['MC-MULTI','MC-PANTO-BIOTIN'], // 비타민A/나이아신 포함 제품
+    restrictNutrients: ['철'],
+    warnNutrients: ['비타민A','나이아신'],
+    message: '간기능이 저하되어 있는 경우, 일부 영양소(비타민A, 나이아신, 철분 등)가 간에 부담을 줄 수 있어 주의가 필요합니다. 담당 의사와 상의 후 섭취를 권장드립니다.',
+  }
 };
 
 function parseAdminInput(text) {
@@ -2244,12 +2279,14 @@ function parseAdminInput(text) {
     if (currentSection === 'interview_disease') {
       const condKeywords = {
         '고혈압': '고혈압', '당뇨': '당뇨병(2형)', '이상지질': '이상지질혈증',
-        '갑상선.*저하': '갑상선기능저하증', '갑상선.*항진': '갑상선기능항진증',
+        '갑상선.*저하|하시모토': '갑상선기능저하증', '갑상선.*항진|그레이브스': '갑상선기능항진증',
         '골다공': '골다공증', '골감소': '골감소증', '지방간': '지방간',
         '빈혈': '빈혈', '관절': '관절염', '통풍': '통풍',
         '우울|불안': '우울증/불안장애', '역류|GERD': '위식도역류질환(GERD)',
         '과민성.*장|IBS': '과민성대장증후군(IBS)', '전립선': '전립선비대증',
-        '천식|알레르기': '천식/알레르기', '만성신장': '만성신장질환'
+        '천식|알레르기': '천식/알레르기',
+        '만성신장|신부전|신기능.*저하|CKD|투석': '만성신장질환',
+        '간경변|간기능.*저하|간질환|간염': '간기능저하',
       };
       for (const [pattern, condName] of Object.entries(condKeywords)) {
         if (new RegExp(pattern).test(line)) {
@@ -2519,6 +2556,21 @@ async function generateAIDraft() {
     }
   }
 
+  // 4-B. 혈액검사 기반 장기 기능 자동 감지
+  const cr = parsed.bloodTests.creatinine || parsed.creatinine;
+  if (cr) {
+    const crThreshold = parsed.gender === '여성' ? 1.3 : 1.5;
+    if (cr >= crThreshold && !parsed.conditions.includes('만성신장질환')) {
+      parsed.conditions.push('만성신장질환');
+    }
+  }
+  const astVal = parsed.bloodTests.ast, altVal = parsed.bloodTests.alt;
+  if ((astVal && astVal >= 80) || (altVal && altVal >= 80)) {
+    if (!parsed.conditions.includes('간기능저하') && !parsed.conditions.includes('지방간')) {
+      parsed.conditions.push('간기능저하');
+    }
+  }
+
   // 5. 질환별 영양소 추천
   const conditionRecs = [];
   for (const cond of parsed.conditions) {
@@ -2616,6 +2668,60 @@ async function generateAIDraft() {
   // 필수를 5개 이내로 제한, 나머지는 선택으로
   while (recommendedProducts.essential.length > 5) {
     recommendedProducts.optional.unshift(recommendedProducts.essential.pop());
+  }
+
+  // 6-B. 장기 기능 안전 체크 (신기능/간기능)
+  const organWarnings = [];
+
+  for (const [organ, rules] of Object.entries(ORGAN_SAFETY_RULES)) {
+    let triggered = false;
+
+    // 조건 1: conditions에 해당 질환이 있는지
+    if (rules.conditions.some(c => parsed.conditions.includes(c))) triggered = true;
+
+    // 조건 2: 혈액검사 수치가 임계값 초과인지
+    for (const [marker, rule] of Object.entries(rules.bloodMarkers)) {
+      const val = parsed.bloodTests[marker];
+      if (val && val >= rule.threshold) triggered = true;
+    }
+
+    if (!triggered) continue;
+
+    // 제한 제품 제거 + 경고 표시
+    const removed = [];
+    for (const restrictId of rules.restrictProducts) {
+      // essential에서 제거
+      const essIdx = recommendedProducts.essential.findIndex(r => r.id === restrictId);
+      if (essIdx >= 0) {
+        removed.push(recommendedProducts.essential[essIdx]);
+        recommendedProducts.essential.splice(essIdx, 1);
+      }
+      // optional에서 제거
+      const optIdx = recommendedProducts.optional.findIndex(r => r.id === restrictId);
+      if (optIdx >= 0) {
+        removed.push(recommendedProducts.optional[optIdx]);
+        recommendedProducts.optional.splice(optIdx, 1);
+      }
+    }
+
+    // 경고 제품 표시
+    const warned = [];
+    for (const warnId of rules.warnProducts) {
+      const inEss = recommendedProducts.essential.find(r => r.id === warnId);
+      const inOpt = recommendedProducts.optional.find(r => r.id === warnId);
+      if (inEss || inOpt) {
+        const p = PRODUCTS.find(x => x.id === warnId);
+        if (p) warned.push(p.name);
+      }
+    }
+
+    organWarnings.push({
+      organ,
+      message: rules.message,
+      removed: removed.map(r => { const p = PRODUCTS.find(x=>x.id===r.id); return p ? p.name : r.id; }),
+      warned,
+      avoidText: CONDITION_NUTRIENT_GUIDE[rules.conditions[0]]?.avoid || '',
+    });
   }
 
   // 7. 스크리닝 시뮬레이션
@@ -2898,6 +3004,20 @@ async function generateAIDraft() {
     }
   }
 
+  // 장기 기능 경고
+  if (organWarnings.length) {
+    screenHtml += `<h4 style="margin-top:16px;color:var(--danger)">🏥 장기 기능 관련 주의</h4>`;
+    for (const ow of organWarnings) {
+      screenHtml += `<div class="alert alert-danger" style="line-height:2">`;
+      screenHtml += `<strong>${ow.organ === 'kidney' ? '신기능' : '간기능'} 주의</strong><br>`;
+      screenHtml += `${ow.message}<br>`;
+      if (ow.removed.length) screenHtml += `<br><strong style="color:var(--danger)">제외된 제품:</strong> ${ow.removed.join(', ')} (안전을 위해 추천에서 제외)<br>`;
+      if (ow.warned.length) screenHtml += `<strong style="color:#92400e">주의 필요:</strong> ${ow.warned.join(', ')} (의사 상의 후 섭취 권장)<br>`;
+      if (ow.avoidText) screenHtml += `<br><small>회피 권장: ${ow.avoidText}</small>`;
+      screenHtml += `</div>`;
+    }
+  }
+
   screenHtml += `</div>`;
   document.getElementById('ai-screening-alerts').innerHTML = screenHtml;
 
@@ -3059,7 +3179,23 @@ async function generateAIDraft() {
   // 성분 주의 (UL 초과 등은 약사용이므로 고객에게는 부드럽게)
   if (exceeds.length) {
     fullDraft += `■ 성분 관련 안내\n\n`;
-    fullDraft += `위 조합에서 일부 성분이 겹치는 부분이 있어,\n용량을 조절하거나 조합을 조정해 드릴 수 있습니다.\n걱정하지 마시고 편하게 말씀해 주세요.\n\n`;
+    fullDraft += `  위 조합에서 일부 성분이 겹치는 부분이 있어,\n  용량을 조절하거나 조합을 조정해 드릴 수 있습니다.\n  걱정하지 마시고 편하게 말씀해 주세요.\n\n`;
+  }
+
+  // 장기 기능 주의 (고객에게 부드럽게)
+  if (organWarnings.length) {
+    fullDraft += `■ 건강 상태를 고려한 안내\n\n`;
+    for (const ow of organWarnings) {
+      if (ow.organ === 'kidney') {
+        fullDraft += `  ${customerName}님의 신장 건강을 고려하여,\n  일부 미네랄이 고함량으로 들어 있는 제품은\n  추천 목록에서 제외하였습니다.\n`;
+        if (ow.removed.length) fullDraft += `  (제외: ${ow.removed.join(', ')})\n`;
+        fullDraft += `  보충제 섭취 전 담당 의사와 상의해 주시면 더 안심이 됩니다.\n\n`;
+      } else {
+        fullDraft += `  ${customerName}님의 간 건강을 고려하여,\n  일부 영양소가 고함량으로 들어 있는 제품은\n  추천 목록에서 제외하거나 주의 표시를 하였습니다.\n`;
+        if (ow.removed.length) fullDraft += `  (제외: ${ow.removed.join(', ')})\n`;
+        fullDraft += `  보충제 섭취 전 담당 의사와 상의해 주시면 더 안심이 됩니다.\n\n`;
+      }
+    }
   }
 
   // 복용 가이드
